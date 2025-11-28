@@ -129,18 +129,18 @@ def add_user_message(conversation_id: str, content: str):
 
 def add_assistant_message(
     conversation_id: str,
-    divergent_phase: List[Dict[str, Any]],
+    all_rounds: List[Dict[str, Any]],
     stage2: List[Dict[str, Any]],
-    stage3: Dict[str, Any]
+    final_result: Dict[str, Any]
 ):
     """
-    Add an assistant message with all 3 stages to a conversation.
+    Add an assistant message with all rounds to a conversation.
 
     Args:
         conversation_id: Conversation identifier
-        divergent_phase: List of divergent phase responses with roles
-        stage2: List of model rankings
-        stage3: Final synthesized response
+        all_rounds: List of all rounds with responses and chairman assessments
+        stage2: List of model rankings (for backward compatibility)
+        final_result: Final synthesized response
     """
     conversation = get_conversation(conversation_id)
     if conversation is None:
@@ -148,9 +148,9 @@ def add_assistant_message(
 
     conversation["messages"].append({
         "role": "assistant",
-        "divergent_phase": divergent_phase,
+        "all_rounds": all_rounds,
         "stage2": stage2,
-        "stage3": stage3
+        "final_result": final_result
     })
 
     save_conversation(conversation)

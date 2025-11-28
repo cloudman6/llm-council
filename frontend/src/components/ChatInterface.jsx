@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import DivergentPhase from './DivergentPhase';
+import MultiRoundDiscussion from './MultiRoundDiscussion';
 import Stage2 from './Stage2';
 import Stage3 from './Stage3';
 import './ChatInterface.css';
@@ -72,22 +72,23 @@ export default function ChatInterface({
                 <div className="assistant-message">
                   <div className="message-label">LLM Council</div>
 
-                  {/* Divergent Phase */}
-                  {msg.loading?.divergent_phase && (
+                  {/* Multi-Round Discussion */}
+                  {msg.loading?.multi_round && (
                     <div className="stage-loading">
                       <div className="spinner"></div>
-                      <span>Running Divergent Phase: Sequential discussion with roles...</span>
+                      <span>Running Multi-Round Discussion...</span>
                     </div>
                   )}
-                  {msg.divergent_phase && <DivergentPhase responses={msg.divergent_phase} />}
+                  {msg.all_rounds && (
+                    <MultiRoundDiscussion
+                      all_rounds={msg.all_rounds}
+                      stage2={msg.stage2}
+                      final_result={msg.final_result}
+                      metadata={msg.metadata}
+                    />
+                  )}
 
-                  {/* Stage 2 */}
-                  {msg.loading?.stage2 && (
-                    <div className="stage-loading">
-                      <div className="spinner"></div>
-                      <span>Running Stage 2: Peer rankings...</span>
-                    </div>
-                  )}
+                  {/* Stage 2 (for backward compatibility) */}
                   {msg.stage2 && (
                     <Stage2
                       rankings={msg.stage2}
@@ -96,13 +97,7 @@ export default function ChatInterface({
                     />
                   )}
 
-                  {/* Stage 3 */}
-                  {msg.loading?.stage3 && (
-                    <div className="stage-loading">
-                      <div className="spinner"></div>
-                      <span>Running Stage 3: Final synthesis...</span>
-                    </div>
-                  )}
+                  {/* Stage 3 (for backward compatibility) */}
                   {msg.stage3 && <Stage3 finalResponse={msg.stage3} />}
                 </div>
               )}

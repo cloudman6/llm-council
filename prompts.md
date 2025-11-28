@@ -113,7 +113,7 @@
 【输出格式】
 
 {
-  "stability_score": 0.0-1.0,
+  "convergence_score": 0.0-1.0,
   "is_converged": true/false,
   "consensus_points": [...],
   "conflict_points": [...],

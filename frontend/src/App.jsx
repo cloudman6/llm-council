@@ -72,14 +72,12 @@ function App() {
       // Create a partial assistant message that will be updated progressively
       const assistantMessage = {
         role: 'assistant',
-        divergent_phase: null,
+        all_rounds: null,
         stage2: null,
-        stage3: null,
+        final_result: null,
         metadata: null,
         loading: {
-          divergent_phase: false,
-          stage2: false,
-          stage3: false,
+          multi_round: true,
         },
       };
 
@@ -92,73 +90,28 @@ function App() {
       // Send message with streaming
       await api.sendMessageStream(currentConversationId, content, (eventType, event) => {
         switch (eventType) {
-          case 'divergent_phase_start':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.divergent_phase = true;
-              return { ...prev, messages };
-            });
-            break;
-
-          case 'divergent_phase_complete':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.divergent_phase = event.data;
-              lastMsg.loading.divergent_phase = false;
-              return { ...prev, messages };
-            });
-            break;
-
-          case 'stage2_start':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.stage2 = true;
-              return { ...prev, messages };
-            });
-            break;
-
-          case 'stage2_complete':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.stage2 = event.data;
-              lastMsg.metadata = event.metadata;
-              lastMsg.loading.stage2 = false;
-              return { ...prev, messages };
-            });
-            break;
-
-          case 'stage3_start':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.stage3 = true;
-              return { ...prev, messages };
-            });
-            break;
-
-          case 'stage3_complete':
-            setCurrentConversation((prev) => {
-              const messages = [...prev.messages];
-              const lastMsg = messages[messages.length - 1];
-              lastMsg.stage3 = event.data;
-              lastMsg.loading.stage3 = false;
-              return { ...prev, messages };
-            });
+          case 'complete':
+            // Handle complete multi-round response
+            if (event.data) {
+              setCurrentConversation((prev) => {
+                const messages = [...prev.messages];
+                const lastMsg = messages[messages.length - 1];
+                lastMsg.all_rounds = event.data.all_rounds;
+                lastMsg.stage2 = event.data.stage2;
+                lastMsg.final_result = event.data.final_result;
+                lastMsg.metadata = event.data.metadata;
+                lastMsg.loading.multi_round = false;
+                return { ...prev, messages };
+              });
+            }
+            // Stream complete, reload conversations list
+            loadConversations();
+            setIsLoading(false);
             break;
 
           case 'title_complete':
             // Reload conversations to get updated title
             loadConversations();
-            break;
-
-          case 'complete':
-            // Stream complete, reload conversations list
-            loadConversations();
-            setIsLoading(false);
             break;
 
           case 'error':

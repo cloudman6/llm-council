@@ -101,24 +101,24 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
         title = await generate_conversation_title(request.content)
         storage.update_conversation_title(conversation_id, title)
 
-    # Run the 3-stage council process
-    divergent_results, stage2_results, stage3_result, metadata = await run_full_council(
+    # Run the multi-round council process
+    all_rounds_results, stage2_results, final_result, metadata = await run_full_council(
         request.content
     )
 
-    # Add assistant message with all stages
+    # Add assistant message with all rounds
     storage.add_assistant_message(
         conversation_id,
-        divergent_results,
+        all_rounds_results,
         stage2_results,
-        stage3_result
+        final_result
     )
 
     # Return the complete response with metadata
     return {
-        "divergent_phase": divergent_results,
+        "all_rounds": all_rounds_results,
         "stage2": stage2_results,
-        "stage3": stage3_result,
+        "final_result": final_result,
         "metadata": metadata
     }
 
@@ -147,21 +147,20 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             if is_first_message:
                 title_task = asyncio.create_task(generate_conversation_title(request.content))
 
-            # Divergent Phase: Sequential responses
-            yield f"data: {json.dumps({'type': 'divergent_phase_start'})}\n\n"
-            divergent_results = await divergent_phase_responses(request.content)
-            yield f"data: {json.dumps({'type': 'divergent_phase_complete', 'data': divergent_results})}\n\n"
+            # Run the multi-round council process
+            all_rounds_results, stage2_results, final_result, metadata = await run_full_council(request.content)
 
-            # Stage 2: Collect rankings
-            yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
-            stage2_results, label_to_model = await stage2_collect_rankings(request.content, divergent_results)
-            aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
-            yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings}})}\n\n"
-
-            # Stage 3: Synthesize final answer
-            yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
-            stage3_result = await stage3_synthesize_final(request.content, divergent_results, stage2_results)
-            yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
+            # Send complete results
+            complete_data = {
+                'type': 'complete',
+                'data': {
+                    'all_rounds': all_rounds_results,
+                    'stage2': stage2_results,
+                    'final_result': final_result,
+                    'metadata': metadata
+                }
+            }
+            yield f"data: {json.dumps(complete_data)}\n\n"
 
             # Wait for title generation if it was started
             if title_task:
@@ -172,9 +171,9 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             # Save complete assistant message
             storage.add_assistant_message(
                 conversation_id,
-                divergent_results,
+                all_rounds_results,
                 stage2_results,
-                stage3_result
+                final_result
             )
 
             # Send completion event

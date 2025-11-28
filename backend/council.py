@@ -367,16 +367,22 @@ def build_divergent_prompt(user_query: str, previous_responses: List[Dict[str, A
     Returns:
         Formatted prompt string
     """
-    # System prompt with clear structure
-    system_prompt = """# 系统指令
+    # Optimized divergent phase prompt with clear structure
+    system_prompt = """# 角色与任务
 
-## 任务描述
-你是一名参与多智能体协同讨论系统的 AI 模型。
-你的任务是围绕用户提出的问题进行讨论，基于你收到的材料进行推理、反思和表达观点。
+## 角色定义
+你是多智能体协作系统的 AI 模型，参与发散阶段的讨论。
 
-## 输出格式要求（必须严格遵守）
-1. 你的输出必须始终使用 JSON 格式，不得包含解释性文字
-2. JSON 格式必须严格遵循以下结构：
+## 核心任务
+- 围绕用户问题提供你的观点
+- 基于已有讨论内容进行推理和反思
+- 使用结构化 JSON 格式输出
+
+---
+
+# 输出格式
+
+## 必须严格遵守以下 JSON 格式：
 
 ```json
 {
@@ -395,49 +401,44 @@ def build_divergent_prompt(user_query: str, previous_responses: List[Dict[str, A
 }
 ```
 
-3. 不得重复他人观点的原文，应使用你自己的语言表达
-4. 不得绕开 JSON 输出
-5. 保持逻辑清晰、结构化表达
+## 输出要求
+1. 必须使用 JSON 格式，不得包含解释性文字
+2. 不得重复他人观点的原文，使用自己的语言表达
+3. 保持逻辑清晰、结构化表达
 
 ---
+
+# 讨论上下文
 """
 
-
-    # Context section with clear boundaries
-    context_prompt = ""
+    # Add previous responses context
     if previous_responses:
-        context_prompt = """# 讨论上下文
-
-以下是之前其他模型的讨论内容：
-
-"""
+        system_prompt += "\n## 已有讨论内容\n\n"
         for i, prev_response in enumerate(previous_responses, 1):
-            context_prompt += f"## 模型 {i}\n\n"
+            system_prompt += f"### 模型 {i} 的观点\n\n"
             # Show the parsed JSON directly if available, otherwise show raw response
             if prev_response.get('parsed_json'):
                 parsed = prev_response['parsed_json']
-                context_prompt += f"```json\n{json.dumps(parsed, ensure_ascii=False, indent=2)}\n```\n\n"
+                system_prompt += f"```json\n{json.dumps(parsed, ensure_ascii=False, indent=2)}\n```\n\n"
             else:
-                context_prompt += f"{prev_response['response']}\n\n"
-        context_prompt += "---\n"
+                system_prompt += f"{prev_response['response']}\n\n"
 
-    # Main question with clear task
-    question_prompt = f"""# 任务执行
+    system_prompt += "---\n\n# 本轮任务\n\n"
+    system_prompt += f"## 用户原始问题\n{user_query}\n\n"
 
-## 用户问题
-{user_query}
+    system_prompt += "## 你的任务\n"
+    if previous_responses:
+        system_prompt += "基于上述讨论内容，提供你的观点：\n"
+        system_prompt += "- 考虑与之前观点的异同\n"
+        system_prompt += "- 补充新的见解或角度\n"
+    else:
+        system_prompt += "作为第一个发言者，请提供你的初步观点：\n"
+        system_prompt += "- 从多个角度分析问题\n"
+        system_prompt += "- 为后续讨论奠定基础\n"
 
-## 你的任务
-请基于上述讨论内容，提供你的观点。
+    system_prompt += "\n---\n\n# 开始回答\n请严格按照指定 JSON 格式输出你的观点。"
 
-**重要提示：**
-- 请严格按照指定的 JSON 格式输出
-- 不要包含任何额外的解释性文字
-- 考虑与之前观点的异同
-
-请开始你的回答："""
-
-    return system_prompt + context_prompt + question_prompt
+    return system_prompt
 
 
 def validate_and_parse_json(response_text: str, model_name: str) -> Dict[str, Any]:
@@ -479,17 +480,364 @@ def validate_and_parse_json(response_text: str, model_name: str) -> Dict[str, An
         return {}
 
 
+async def evaluate_convergence(
+    user_query: str,
+    round_responses: List[Dict[str, Any]],
+    round_number: int
+) -> Dict[str, Any]:
+    """
+    Evaluate convergence and generate chairman's assessment.
+
+    Args:
+        user_query: The user's question
+        round_responses: List of model responses for this round
+        round_number: Current round number (1 for divergent, 2+ for convergent)
+
+    Returns:
+        Chairman's assessment in JSON format
+    """
+    # Build responses text for chairman
+    responses_text = "\n\n".join([
+        f"{result['model']}:\n{result['response']}"
+        for result in round_responses
+    ])
+
+    # Build optimized chairman prompt with clear structure
+    chairman_prompt = f"""# 角色定义
+你是多智能体协作系统的 Chairman LLM（主持人模型），负责引导讨论进程并评估收敛状态。
+
+---
+
+# 核心任务
+
+## 1. 内容分析
+- 分析各 LLM 的最新回复内容
+- 提炼共识观点（共同认可的核心内容）
+- 识别冲突观点（存在分歧的关键问题）
+
+## 2. 收敛评估
+判断本轮讨论是否"趋于收敛"（稳定化）。
+
+**收敛定义**（注意：收敛 ≠ 全体同意）：
+- 各模型不再提出显著新的关键观点
+- 剩余分歧稳定且清晰，不再扩散
+- 讨论形成稳定框架（明确共识点 + 明确分歧点）
+- 现有信息足够生成高质量综合答案
+
+## 3. 决策输出
+- **若已收敛**：输出最终综合结论
+- **若未收敛**：生成下一轮讨论的具体问题
+
+---
+
+# 评估标准
+
+## 收敛评估维度（主观评分 0-1 分）
+
+1. **新观点减少程度**
+   - 本轮是否基本停止出现新的关键观点？
+
+2. **分歧稳定性**
+   - 分歧是否稳定、清晰，而非不断扩散？
+
+3. **结构化一致性**
+   - 讨论是否形成稳定的框架？
+
+4. **信息充分性**
+   - 当前内容是否足以写出高质量综合结论？
+
+**注意**：基于整体语义主观判断，无需严格数学计算。
+
+---
+
+# 输出格式
+
+## 必须严格遵守以下 JSON 格式：
+
+```json
+{{
+  "convergence_score": 0.0-1.0,
+  "is_converged": true/false,
+  "consensus_points": ["共识点1", "共识点2", ...],
+  "conflict_points": ["冲突点1", "冲突点2", ...],
+  "explanation": "为什么你判断已/未收敛",
+  "questions_for_next_round": [
+    "问题1",
+    "问题2",
+    "问题3"
+  ],
+  "final_integrated_conclusion": "如果需要停止讨论，请给出最终综合答案"
+}}
+```
+
+## 输出规则
+- 若 `is_converged = true` → 必须输出 `final_integrated_conclusion`
+- 若 `is_converged = false` → 必须输出 `questions_for_next_round`
+
+---
+
+# 待分析内容
+
+## 用户原始问题
+{user_query}
+
+## 本轮 LLM 回复内容
+{responses_text}
+
+---
+
+# 开始分析
+请基于以上信息，严格按照指定格式输出你的分析结果。"""
+
+    messages = [{"role": "user", "content": chairman_prompt}]
+
+    # Log chairman prompt for debugging
+    print(f"\n=== Chairman Prompt (Round {round_number}) ===")
+    print(f"Prompt length: {len(chairman_prompt)} characters")
+    print("Prompt content:")
+    print("-" * 80)
+    print(chairman_prompt)
+    print("-" * 80)
+
+    # Query the chairman model
+    response = await query_model(CHAIRMAN_MODEL, messages)
+
+    # Log chairman response for debugging
+    if response is not None:
+        response_text = response.get('content', '')
+        print(f"\n=== Chairman Response (Round {round_number}) ===")
+        print(f"Response length: {len(response_text)} characters")
+        print("Response content:")
+        print("-" * 80)
+        print(response_text)
+        print("-" * 80)
+    else:
+        print(f"\n=== Chairman Response (Round {round_number}) ===")
+        print("Chairman failed to respond")
+
+    if response is None:
+        # Fallback if chairman fails
+        return {
+            "convergence_score": 0.0,
+            "is_converged": False,
+            "consensus_points": [],
+            "conflict_points": [],
+            "explanation": "Chairman failed to respond",
+            "questions_for_next_round": ["Please continue the discussion"],
+            "final_integrated_conclusion": ""
+        }
+
+    response_text = response.get('content', '')
+
+    # Parse chairman's JSON response
+    try:
+        # Remove any markdown code block markers
+        cleaned_text = response_text.strip()
+        if cleaned_text.startswith('```json'):
+            cleaned_text = cleaned_text[7:]
+        if cleaned_text.startswith('```'):
+            cleaned_text = cleaned_text[3:]
+        if cleaned_text.endswith('```'):
+            cleaned_text = cleaned_text[:-3]
+
+        chairman_assessment = json.loads(cleaned_text.strip())
+
+        # Log parsed assessment for debugging
+        print(f"\n=== Parsed Chairman Assessment (Round {round_number}) ===")
+        print(f"Convergence Score: {chairman_assessment.get('convergence_score', 'N/A')}")
+        print(f"Converged: {chairman_assessment.get('is_converged', 'N/A')}")
+        print(f"Consensus Points: {chairman_assessment.get('consensus_points', [])}")
+        print(f"Conflict Points: {chairman_assessment.get('conflict_points', [])}")
+        print(f"Explanation: {chairman_assessment.get('explanation', 'N/A')}")
+        print(f"Questions for Next Round: {chairman_assessment.get('questions_for_next_round', [])}")
+        print(f"Final Conclusion: {chairman_assessment.get('final_integrated_conclusion', 'N/A')}")
+
+        # Validate required fields
+        required_fields = [
+            'convergence_score', 'is_converged', 'consensus_points',
+            'conflict_points', 'explanation', 'questions_for_next_round',
+            'final_integrated_conclusion'
+        ]
+        for field in required_fields:
+            if field not in chairman_assessment:
+                print(f"Warning: Chairman missing required field '{field}' in JSON")
+                chairman_assessment[field] = "" if field == "final_integrated_conclusion" else []
+
+        return chairman_assessment
+
+    except json.JSONDecodeError as e:
+        print(f"Warning: Chairman returned invalid JSON: {e}")
+        print(f"Response text: {response_text}")
+        return {
+            "convergence_score": 0.0,
+            "is_converged": False,
+            "consensus_points": [],
+            "conflict_points": [],
+            "explanation": "Invalid JSON response from chairman",
+            "questions_for_next_round": ["Please continue the discussion"],
+            "final_integrated_conclusion": ""
+        }
+
+
+def build_convergent_prompt(
+    user_query: str,
+    consensus_points: List[str],
+    conflict_points: List[str],
+    questions: List[str]
+) -> str:
+    """
+    Build prompt for convergent phase based on chairman's assessment.
+
+    Args:
+        user_query: The user's question
+        consensus_points: List of consensus points from chairman
+        conflict_points: List of conflict points from chairman
+        questions: List of questions for next round
+
+    Returns:
+        Formatted prompt string for convergent phase
+    """
+    # Optimized convergent phase prompt with clear structure
+    system_prompt = """# 角色与任务
+
+## 角色定义
+你是多智能体协作系统的 AI 模型，参与收敛阶段的讨论。
+
+## 核心任务
+- 基于讨论上下文和本轮指定问题，提供你的观点
+- 促进共识形成，帮助讨论收敛
+- 使用结构化 JSON 格式输出
+
+---
+
+# 输出格式
+
+## 必须严格遵守以下 JSON 格式：
+
+```json
+{
+  "summary": "本轮你的思考简述",
+  "viewpoints": [
+    "你的主要观点1",
+    "你的主要观点2"
+  ],
+  "conflicts": [
+    "你与其他观点的主要不同点（若有）"
+  ],
+  "suggestions": [
+    "基于讨论你认为应该增加或修正的内容"
+  ],
+  "final_answer_candidate": "如果你需要提供最终答案，请放在这里"
+}
+```
+
+## 输出要求
+1. 必须使用 JSON 格式，不得包含解释性文字
+2. 不得重复他人观点的原文，使用自己的语言表达
+3. 保持逻辑清晰、结构化表达
+
+---
+
+# 讨论上下文
+
+## Chairman 总结
+
+### 共识点
+"""
+
+    # Add consensus points
+    for point in consensus_points:
+        system_prompt += f"- {point}\n"
+
+    system_prompt += "\n### 冲突点\n"
+    for point in conflict_points:
+        system_prompt += f"- {point}\n"
+
+    system_prompt += "\n---\n\n# 本轮任务\n\n## 用户原始问题\n"
+    system_prompt += f"{user_query}\n\n"
+
+    system_prompt += "## 本轮必须回答的问题\n"
+    for i, question in enumerate(questions, 1):
+        system_prompt += f"{i}. {question}\n"
+
+    system_prompt += "\n---\n\n# 开始回答\n请基于以上信息，严格按照指定 JSON 格式输出你的观点。"
+
+    return system_prompt
+
+
+async def run_convergent_phase(
+    user_query: str,
+    consensus_points: List[str],
+    conflict_points: List[str],
+    questions: List[str]
+) -> List[Dict[str, Any]]:
+    """
+    Run convergent phase where models respond independently to chairman's questions.
+
+    Args:
+        user_query: The user's question
+        consensus_points: List of consensus points from chairman
+        conflict_points: List of conflict points from chairman
+        questions: List of questions for next round
+
+    Returns:
+        List of convergent phase responses
+    """
+    convergent_results = []
+
+    # Build convergent prompt
+    prompt = build_convergent_prompt(user_query, consensus_points, conflict_points, questions)
+    messages = [{"role": "user", "content": prompt}]
+
+    # Log convergent phase prompt for debugging
+    print(f"\n=== Convergent Phase Prompt ===")
+    print(f"Prompt length: {len(prompt)} characters")
+    print("Prompt content:")
+    print("-" * 80)
+    print(prompt)
+    print("-" * 80)
+
+    # Query all models in parallel
+    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+
+    # Format results
+    for model, response in responses.items():
+        if response is not None:
+            response_text = response.get('content', '')
+            parsed_json = validate_and_parse_json(response_text, model)
+
+            # Log convergent phase response for debugging
+            print(f"\n=== Convergent Phase - Response from {model} ===")
+            print(f"Response length: {len(response_text)} characters")
+            print("Response content:")
+            print("-" * 80)
+            print(response_text)
+            print("-" * 80)
+
+            convergent_results.append({
+                "model": model,
+                "response": response_text,
+                "parsed_json": parsed_json
+            })
+
+    return convergent_results
+
+
 async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
     """
-    Run the complete 3-stage council process.
+    Run the complete multi-round council process.
 
     Args:
         user_query: The user's question
 
     Returns:
-        Tuple of (divergent_results, stage2_results, stage3_result, metadata)
+        Tuple of (all_rounds_results, stage2_results, final_result, metadata)
     """
-    # Divergent Phase: Sequential responses with role assignments
+    all_rounds_results = []
+    max_rounds = 5  # Maximum rounds including divergent phase
+
+    # Round 1: Divergent Phase
+    print(f"\n=== Round 1: Divergent Phase ===")
     divergent_results = await divergent_phase_responses(user_query)
 
     # If no models responded successfully, return error
@@ -499,34 +847,64 @@ async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
             "response": "All models failed to respond. Please try again."
         }, {}
 
-    # DEBUG MODE: Stop after divergent phase for debugging
-    print("\n=== DEBUG MODE: Stopping after divergent phase ===")
-    print(f"Returning {len(divergent_results)} divergent results")
+    all_rounds_results.append({
+        "round": 1,
+        "type": "divergent",
+        "responses": divergent_results
+    })
 
-    # Return empty stage2 and stage3 results for debugging
-    return divergent_results, [], {
-        "model": "debug",
-        "response": "Stopped after divergent phase for debugging"
-    }, {}
+    # Evaluate convergence after divergent phase
+    chairman_assessment = await evaluate_convergence(user_query, divergent_results, 1)
 
-    # TODO: Uncomment below to re-enable full 3-stage process
-    # # Stage 2: Collect rankings (using divergent phase responses as input)
-    # stage2_results, label_to_model = await stage2_collect_rankings(user_query, divergent_results)
-    #
-    # # Calculate aggregate rankings
-    # aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
-    #
-    # # Stage 3: Synthesize final answer
-    # stage3_result = await stage3_synthesize_final(
-    #     user_query,
-    #     divergent_results,
-    #     stage2_results
-    # )
-    #
-    # # Prepare metadata
-    # metadata = {
-    #     "label_to_model": label_to_model,
-    #     "aggregate_rankings": aggregate_rankings
-    # }
-    #
-    # return divergent_results, stage2_results, stage3_result, metadata
+    # Add chairman assessment to results
+    all_rounds_results[-1]["chairman_assessment"] = chairman_assessment
+
+    # Check if converged after divergent phase
+    if chairman_assessment.get("is_converged", False):
+        print(f"\n=== Converged after divergent phase ===")
+        return all_rounds_results, [], {
+            "model": CHAIRMAN_MODEL,
+            "response": chairman_assessment.get("final_integrated_conclusion", "")
+        }, {"converged_round": 1}
+
+    # Continue with convergent phases
+    current_round = 2
+    while current_round <= max_rounds:
+        print(f"\n=== Round {current_round}: Convergent Phase ===")
+
+        # Run convergent phase
+        convergent_results = await run_convergent_phase(
+            user_query,
+            chairman_assessment["consensus_points"],
+            chairman_assessment["conflict_points"],
+            chairman_assessment["questions_for_next_round"]
+        )
+
+        all_rounds_results.append({
+            "round": current_round,
+            "type": "convergent",
+            "responses": convergent_results
+        })
+
+        # Evaluate convergence
+        chairman_assessment = await evaluate_convergence(user_query, convergent_results, current_round)
+
+        # Add chairman assessment to results
+        all_rounds_results[-1]["chairman_assessment"] = chairman_assessment
+
+        # Check if converged
+        if chairman_assessment.get("is_converged", False):
+            print(f"\n=== Converged after round {current_round} ===")
+            return all_rounds_results, [], {
+                "model": CHAIRMAN_MODEL,
+                "response": chairman_assessment.get("final_integrated_conclusion", "")
+            }, {"converged_round": current_round}
+
+        current_round += 1
+
+    # If reached max rounds without convergence
+    print(f"\n=== Reached maximum rounds ({max_rounds}) without convergence ===")
+    return all_rounds_results, [], {
+        "model": CHAIRMAN_MODEL,
+        "response": chairman_assessment.get("final_integrated_conclusion", "Maximum rounds reached without convergence")
+    }, {"converged_round": None}

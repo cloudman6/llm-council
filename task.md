@@ -5,10 +5,15 @@ Your task is NOT to implement this yet, but to fully understand and prepare.
 Here is exactly what I need implemented:
 
 ```
-阅读 @requirement.md，实现新的的第一阶段：发散讨论（Divergent Phase）
+按照 @requirement.md，每一轮所有LLM都回答完毕后，Chairman 都需要：
+- 总结观点：共同点和冲突点
+- 判断是否达成共识
+- 如未收敛，生成下一轮问题
+- 收敛则输出最终答案
+
+实现chairman 的上述功能
 1. 所需的 prompt 可参考 @prompts.md
-2. 按顺序调用 LLM，每个 LLM 都需要看到前面所有 LLM 的回答
-3. 要为每个 LLM 分配不同的 role。 role 已在 @prompts.md 中定义。
+2. prompt 中LLM的回答直接使用其JSON格式
 ```
 
 ---
