@@ -10,7 +10,7 @@ wheels/
 .venv
 
 # Keys and secrets
-.env
+.env*
 
 # Data files
 data/

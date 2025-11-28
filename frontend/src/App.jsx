@@ -72,12 +72,12 @@ function App() {
       // Create a partial assistant message that will be updated progressively
       const assistantMessage = {
         role: 'assistant',
-        stage1: null,
+        divergent_phase: null,
         stage2: null,
         stage3: null,
         metadata: null,
         loading: {
-          stage1: false,
+          divergent_phase: false,
           stage2: false,
           stage3: false,
         },
@@ -92,21 +92,21 @@ function App() {
       // Send message with streaming
       await api.sendMessageStream(currentConversationId, content, (eventType, event) => {
         switch (eventType) {
-          case 'stage1_start':
+          case 'divergent_phase_start':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
               const lastMsg = messages[messages.length - 1];
-              lastMsg.loading.stage1 = true;
+              lastMsg.loading.divergent_phase = true;
               return { ...prev, messages };
             });
             break;
 
-          case 'stage1_complete':
+          case 'divergent_phase_complete':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
               const lastMsg = messages[messages.length - 1];
-              lastMsg.stage1 = event.data;
-              lastMsg.loading.stage1 = false;
+              lastMsg.divergent_phase = event.data;
+              lastMsg.loading.divergent_phase = false;
               return { ...prev, messages };
             });
             break;

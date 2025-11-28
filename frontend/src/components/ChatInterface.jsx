@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import Stage1 from './Stage1';
+import DivergentPhase from './DivergentPhase';
 import Stage2 from './Stage2';
 import Stage3 from './Stage3';
 import './ChatInterface.css';
@@ -72,14 +72,14 @@ export default function ChatInterface({
                 <div className="assistant-message">
                   <div className="message-label">LLM Council</div>
 
-                  {/* Stage 1 */}
-                  {msg.loading?.stage1 && (
+                  {/* Divergent Phase */}
+                  {msg.loading?.divergent_phase && (
                     <div className="stage-loading">
                       <div className="spinner"></div>
-                      <span>Running Stage 1: Collecting individual responses...</span>
+                      <span>Running Divergent Phase: Sequential discussion with roles...</span>
                     </div>
                   )}
-                  {msg.stage1 && <Stage1 responses={msg.stage1} />}
+                  {msg.divergent_phase && <DivergentPhase responses={msg.divergent_phase} />}
 
                   {/* Stage 2 */}
                   {msg.loading?.stage2 && (

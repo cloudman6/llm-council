@@ -1,8 +1,71 @@
 """3-stage LLM Council orchestration."""
 
 from typing import List, Dict, Any, Tuple
+import json
 from .openrouter import query_models_parallel, query_model
 from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
+
+
+
+
+
+async def divergent_phase_responses(user_query: str) -> List[Dict[str, Any]]:
+    """
+    Divergent Phase: Sequential responses where each model sees all previous responses.
+
+    Args:
+        user_query: The user's question
+
+    Returns:
+        List of dicts with 'model', 'response', and 'parsed_json' keys
+    """
+    divergent_results = []
+    accumulated_responses = []
+
+    # Process models sequentially
+    for i, model in enumerate(COUNCIL_MODELS):
+        # Build prompt with accumulated context
+        prompt = build_divergent_prompt(user_query, accumulated_responses)
+        messages = [{"role": "user", "content": prompt}]
+
+        # Log prompt for debugging
+        print(f"\n=== Divergent Phase - Model {i+1}: {model} ===")
+        print(f"Prompt length: {len(prompt)} characters")
+        print("Prompt content:")
+        print("-" * 80)
+        print(prompt)
+        print("-" * 80)
+
+        # Query the model
+        response = await query_model(model, messages)
+
+        if response is not None:
+            response_text = response.get('content', '')
+
+            # Log response for debugging
+            print(f"\n=== Response from {model} ===")
+            print(f"Response length: {len(response_text)} characters")
+            print("Response content:")
+            print("-" * 80)
+            print(response_text)
+            print("-" * 80)
+
+            # Validate and parse JSON
+            parsed_json = validate_and_parse_json(response_text, model)
+
+            result = {
+                "model": model,
+                "response": response_text,
+                "parsed_json": parsed_json
+            }
+
+            divergent_results.append(result)
+            accumulated_responses.append(result)
+        else:
+            # If model fails, continue with next model
+            print(f"Warning: Model {model} failed to respond in divergent phase")
+
+    return divergent_results
 
 
 async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
@@ -293,6 +356,140 @@ Title:"""
     return title
 
 
+def build_divergent_prompt(user_query: str, previous_responses: List[Dict[str, Any]]) -> str:
+    """
+    Build prompt for divergent phase based on accumulated context.
+
+    Args:
+        user_query: The user's question
+        previous_responses: List of previous model responses
+
+    Returns:
+        Formatted prompt string
+    """
+    # System prompt with clear structure
+    system_prompt = """# 系统指令
+
+## 任务描述
+你是一名参与多智能体协同讨论系统的 AI 模型。
+你的任务是围绕用户提出的问题进行讨论，基于你收到的材料进行推理、反思和表达观点。
+
+## 输出格式要求（必须严格遵守）
+1. 你的输出必须始终使用 JSON 格式，不得包含解释性文字
+2. JSON 格式必须严格遵循以下结构：
+
+```json
+{
+  "summary": "本轮你的思考简述",
+  "viewpoints": [
+    "你的主要观点1",
+    "你的主要观点2"
+  ],
+  "conflicts": [
+    "你与其他观点的主要不同点（若有）"
+  ],
+  "suggestions": [
+    "基于讨论你认为应该增加或修正的内容"
+  ],
+  "final_answer_candidate": "如果你需要提供最终答案，请放在这里"
+}
+```
+
+3. 不得重复他人观点的原文，应使用你自己的语言表达
+4. 不得绕开 JSON 输出
+5. 保持逻辑清晰、结构化表达
+
+---
+"""
+
+
+    # Context section with clear boundaries
+    context_prompt = ""
+    if previous_responses:
+        context_prompt = """# 讨论上下文
+
+以下是之前其他模型的讨论内容：
+
+"""
+        for i, prev_response in enumerate(previous_responses, 1):
+            context_prompt += f"## 模型 {i}\n\n"
+            # Show the parsed JSON if available, otherwise show raw response
+            if prev_response.get('parsed_json'):
+                parsed = prev_response['parsed_json']
+                if parsed.get('summary'):
+                    context_prompt += f"**总结**: {parsed['summary']}\n\n"
+                if parsed.get('viewpoints'):
+                    context_prompt += f"**观点**:\n"
+                    for viewpoint in parsed['viewpoints']:
+                        context_prompt += f"- {viewpoint}\n"
+                    context_prompt += "\n"
+                if parsed.get('conflicts'):
+                    context_prompt += f"**不同点**:\n"
+                    for conflict in parsed['conflicts']:
+                        context_prompt += f"- {conflict}\n"
+                    context_prompt += "\n"
+            else:
+                context_prompt += f"{prev_response['response']}\n\n"
+        context_prompt += "---\n"
+
+    # Main question with clear task
+    question_prompt = f"""# 任务执行
+
+## 用户问题
+{user_query}
+
+## 你的任务
+请基于上述讨论内容，提供你的观点。
+
+**重要提示：**
+- 请严格按照指定的 JSON 格式输出
+- 不要包含任何额外的解释性文字
+- 考虑与之前观点的异同
+
+请开始你的回答："""
+
+    return system_prompt + context_prompt + question_prompt
+
+
+def validate_and_parse_json(response_text: str, model_name: str) -> Dict[str, Any]:
+    """
+    Validate and parse JSON response with retry logic.
+
+    Args:
+        response_text: The raw response text from the model
+        model_name: Name of the model for error reporting
+
+    Returns:
+        Parsed JSON dict or empty dict if validation fails
+    """
+    # Try to parse JSON
+    try:
+        # Remove any markdown code block markers
+        cleaned_text = response_text.strip()
+        if cleaned_text.startswith('```json'):
+            cleaned_text = cleaned_text[7:]
+        if cleaned_text.startswith('```'):
+            cleaned_text = cleaned_text[3:]
+        if cleaned_text.endswith('```'):
+            cleaned_text = cleaned_text[:-3]
+
+        parsed = json.loads(cleaned_text.strip())
+
+        # Validate required fields
+        required_fields = ['summary', 'viewpoints', 'conflicts', 'suggestions', 'final_answer_candidate']
+        for field in required_fields:
+            if field not in parsed:
+                print(f"Warning: Model {model_name} missing required field '{field}' in JSON")
+                return {}
+
+        return parsed
+
+    except json.JSONDecodeError as e:
+        print(f"Warning: Model {model_name} returned invalid JSON: {e}")
+        print(f"Response text: {response_text}")
+        return {}
+
+
 async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
     """
     Run the complete 3-stage council process.
@@ -301,35 +498,46 @@ async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
         user_query: The user's question
 
     Returns:
-        Tuple of (stage1_results, stage2_results, stage3_result, metadata)
+        Tuple of (divergent_results, stage2_results, stage3_result, metadata)
     """
-    # Stage 1: Collect individual responses
-    stage1_results = await stage1_collect_responses(user_query)
+    # Divergent Phase: Sequential responses with role assignments
+    divergent_results = await divergent_phase_responses(user_query)
 
     # If no models responded successfully, return error
-    if not stage1_results:
+    if not divergent_results:
         return [], [], {
             "model": "error",
             "response": "All models failed to respond. Please try again."
         }, {}
 
-    # Stage 2: Collect rankings
-    stage2_results, label_to_model = await stage2_collect_rankings(user_query, stage1_results)
+    # DEBUG MODE: Stop after divergent phase for debugging
+    print("\n=== DEBUG MODE: Stopping after divergent phase ===")
+    print(f"Returning {len(divergent_results)} divergent results")
 
-    # Calculate aggregate rankings
-    aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
+    # Return empty stage2 and stage3 results for debugging
+    return divergent_results, [], {
+        "model": "debug",
+        "response": "Stopped after divergent phase for debugging"
+    }, {}
 
-    # Stage 3: Synthesize final answer
-    stage3_result = await stage3_synthesize_final(
-        user_query,
-        stage1_results,
-        stage2_results
-    )
-
-    # Prepare metadata
-    metadata = {
-        "label_to_model": label_to_model,
-        "aggregate_rankings": aggregate_rankings
-    }
-
-    return stage1_results, stage2_results, stage3_result, metadata
+    # TODO: Uncomment below to re-enable full 3-stage process
+    # # Stage 2: Collect rankings (using divergent phase responses as input)
+    # stage2_results, label_to_model = await stage2_collect_rankings(user_query, divergent_results)
+    #
+    # # Calculate aggregate rankings
+    # aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
+    #
+    # # Stage 3: Synthesize final answer
+    # stage3_result = await stage3_synthesize_final(
+    #     user_query,
+    #     divergent_results,
+    #     stage2_results
+    # )
+    #
+    # # Prepare metadata
+    # metadata = {
+    #     "label_to_model": label_to_model,
+    #     "aggregate_rankings": aggregate_rankings
+    # }
+    #
+    # return divergent_results, stage2_results, stage3_result, metadata

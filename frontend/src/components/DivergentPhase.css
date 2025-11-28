@@ -1,0 +1,95 @@
+.divergent-phase {
+  margin-bottom: 2rem;
+}
+
+.stage-description {
+  color: #666;
+  margin-bottom: 1rem;
+  font-style: italic;
+}
+
+.role-badge {
+  background: #4a90e2;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  margin-left: 8px;
+  font-weight: normal;
+}
+
+.model-info {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  border-left: 4px solid #4a90e2;
+}
+
+.model-name {
+  font-weight: bold;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.role-info {
+  margin-bottom: 0.5rem;
+}
+
+.role-description {
+  color: #666;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.response-section,
+.parsed-json-section {
+  margin-bottom: 1.5rem;
+}
+
+.response-section h4,
+.parsed-json-section h4 {
+  color: #4a90e2;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #e9ecef;
+  padding-bottom: 0.25rem;
+}
+
+.json-content {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.json-field {
+  margin-bottom: 1rem;
+}
+
+.json-field:last-child {
+  margin-bottom: 0;
+}
+
+.json-field strong {
+  color: #495057;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.json-field ul {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.json-field li {
+  margin-bottom: 0.25rem;
+}
+
+.json-error {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  color: #856404;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-top: 1rem;
+}

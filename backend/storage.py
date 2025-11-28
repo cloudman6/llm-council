@@ -129,7 +129,7 @@ def add_user_message(conversation_id: str, content: str):
 
 def add_assistant_message(
     conversation_id: str,
-    stage1: List[Dict[str, Any]],
+    divergent_phase: List[Dict[str, Any]],
     stage2: List[Dict[str, Any]],
     stage3: Dict[str, Any]
 ):
@@ -138,7 +138,7 @@ def add_assistant_message(
 
     Args:
         conversation_id: Conversation identifier
-        stage1: List of individual model responses
+        divergent_phase: List of divergent phase responses with roles
         stage2: List of model rankings
         stage3: Final synthesized response
     """
@@ -148,7 +148,7 @@ def add_assistant_message(
 
     conversation["messages"].append({
         "role": "assistant",
-        "stage1": stage1,
+        "divergent_phase": divergent_phase,
         "stage2": stage2,
         "stage3": stage3
     })
