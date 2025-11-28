@@ -413,21 +413,10 @@ def build_divergent_prompt(user_query: str, previous_responses: List[Dict[str, A
 """
         for i, prev_response in enumerate(previous_responses, 1):
             context_prompt += f"## 模型 {i}\n\n"
-            # Show the parsed JSON if available, otherwise show raw response
+            # Show the parsed JSON directly if available, otherwise show raw response
             if prev_response.get('parsed_json'):
                 parsed = prev_response['parsed_json']
-                if parsed.get('summary'):
-                    context_prompt += f"**总结**: {parsed['summary']}\n\n"
-                if parsed.get('viewpoints'):
-                    context_prompt += f"**观点**:\n"
-                    for viewpoint in parsed['viewpoints']:
-                        context_prompt += f"- {viewpoint}\n"
-                    context_prompt += "\n"
-                if parsed.get('conflicts'):
-                    context_prompt += f"**不同点**:\n"
-                    for conflict in parsed['conflicts']:
-                        context_prompt += f"- {conflict}\n"
-                    context_prompt += "\n"
+                context_prompt += f"```json\n{json.dumps(parsed, ensure_ascii=False, indent=2)}\n```\n\n"
             else:
                 context_prompt += f"{prev_response['response']}\n\n"
         context_prompt += "---\n"

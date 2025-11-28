@@ -1,5 +1,16 @@
-.divergent-phase {
-  margin-bottom: 2rem;
+.stage {
+  margin: 24px 0;
+  padding: 20px;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.stage-title {
+  margin: 0 0 16px 0;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .stage-description {
@@ -8,51 +19,56 @@
   font-style: italic;
 }
 
-.role-badge {
-  background: #4a90e2;
-  color: white;
-  padding: 2px 6px;
-  border-radius: 12px;
-  font-size: 0.7rem;
-  margin-left: 8px;
-  font-weight: normal;
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 
-.model-info {
-  background: #f8f9fa;
-  padding: 1rem;
-  border-radius: 8px;
-  margin-bottom: 1rem;
-  border-left: 4px solid #4a90e2;
+.tab {
+  padding: 8px 16px;
+  background: #ffffff;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px 6px 0 0;
+  color: #666;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
 }
+
+.tab:hover {
+  background: #f0f0f0;
+  color: #333;
+  border-color: #4a90e2;
+}
+
+.tab.active {
+  background: #ffffff;
+  color: #4a90e2;
+  border-color: #4a90e2;
+  border-bottom-color: #ffffff;
+  font-weight: 600;
+}
+
+.tab-content {
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
 
 .model-name {
-  font-weight: bold;
-  font-size: 1.1rem;
-  margin-bottom: 0.5rem;
+  color: #888;
+  font-size: 12px;
+  margin-bottom: 12px;
+  font-family: monospace;
 }
 
-.role-info {
-  margin-bottom: 0.5rem;
-}
 
-.role-description {
-  color: #666;
-  font-size: 0.9rem;
-  line-height: 1.4;
-}
-
-.response-section,
 .parsed-json-section {
   margin-bottom: 1.5rem;
-}
-
-.response-section h4,
-.parsed-json-section h4 {
-  color: #4a90e2;
-  margin-bottom: 0.5rem;
-  border-bottom: 1px solid #e9ecef;
-  padding-bottom: 0.25rem;
 }
 
 .json-content {

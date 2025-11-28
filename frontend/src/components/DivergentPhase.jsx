@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import ReactMarkdown from 'react-markdown';
 import './DivergentPhase.css';
 
 export default function DivergentPhase({ responses }) {
@@ -30,26 +29,9 @@ export default function DivergentPhase({ responses }) {
       </div>
 
       <div className="tab-content">
-        <div className="model-info">
-          <div className="model-name">{responses[activeTab].model}</div>
-          <div className="role-info">
-            <strong>Role:</strong> {responses[activeTab].role_name}
-          </div>
-          <div className="role-description">
-            {responses[activeTab].role_description}
-          </div>
-        </div>
-
-        <div className="response-section">
-          <h4>Raw Response:</h4>
-          <div className="response-text markdown-content">
-            <ReactMarkdown>{responses[activeTab].response}</ReactMarkdown>
-          </div>
-        </div>
-
+        <div className="model-name">{responses[activeTab].model}</div>
         {responses[activeTab].parsed_json && (
           <div className="parsed-json-section">
-            <h4>Parsed JSON:</h4>
             <div className="json-content">
               <div className="json-field">
                 <strong>Summary:</strong> {responses[activeTab].parsed_json.summary}
