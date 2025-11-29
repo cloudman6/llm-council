@@ -10,7 +10,7 @@ import json
 import asyncio
 
 from . import storage
-from .council import run_full_council, generate_conversation_title, divergent_phase_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
+from .council import run_full_council, run_full_council_stream, generate_conversation_title, divergent_phase_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
 
 app = FastAPI(title="LLM Council API")
 
@@ -147,20 +147,9 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             if is_first_message:
                 title_task = asyncio.create_task(generate_conversation_title(request.content))
 
-            # Run the multi-round council process
-            all_rounds_results, stage2_results, final_result, metadata = await run_full_council(request.content)
-
-            # Send complete results
-            complete_data = {
-                'type': 'complete',
-                'data': {
-                    'all_rounds': all_rounds_results,
-                    'stage2': stage2_results,
-                    'final_result': final_result,
-                    'metadata': metadata
-                }
-            }
-            yield f"data: {json.dumps(complete_data)}\n\n"
+            # Run the multi-round council process with streaming
+            async for event in run_full_council_stream(request.content):
+                yield f"data: {json.dumps(event)}\n\n"
 
             # Wait for title generation if it was started
             if title_task:
@@ -168,16 +157,8 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 storage.update_conversation_title(conversation_id, title)
                 yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
 
-            # Save complete assistant message
-            storage.add_assistant_message(
-                conversation_id,
-                all_rounds_results,
-                stage2_results,
-                final_result
-            )
-
-            # Send completion event
-            yield f"data: {json.dumps({'type': 'complete'})}\n\n"
+            # Send final completion event
+            yield f"data: {json.dumps({'type': 'stream_complete'})}\n\n"
 
         except Exception as e:
             # Send error event
