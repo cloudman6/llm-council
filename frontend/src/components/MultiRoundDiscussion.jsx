@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import './MultiRoundDiscussion.css';
 
@@ -9,20 +9,41 @@ export default function MultiRoundDiscussion({ all_rounds, stage2, final_result,
   const [selectedRound, setSelectedRound] = useState(0);
   const [selectedModel, setSelectedModel] = useState({});
 
-  if (!all_rounds || all_rounds.length === 0) {
-    return null;
-  }
+  // Auto-select the latest round when data updates
+  useEffect(() => {
+    if (all_rounds && all_rounds.length > 0) {
+      const latestRound = all_rounds.length - 1;
+      setSelectedRound(latestRound);
+      setSelectedModel(prev => ({
+        ...prev,
+        [latestRound]: 0
+      }));
+    }
+  }, [all_rounds]);
 
   // Initialize selected model for each round
   const handleRoundChange = (roundIndex) => {
     setSelectedRound(roundIndex);
-    if (!selectedModel[roundIndex] && all_rounds[roundIndex].responses.length > 0) {
+    const roundData = all_rounds[roundIndex];
+    if (roundData && roundData.responses && roundData.responses.length > 0 && !selectedModel[roundIndex]) {
       setSelectedModel(prev => ({
         ...prev,
         [roundIndex]: 0
       }));
     }
   };
+
+  // Handle empty or partial data gracefully
+  if (!all_rounds || all_rounds.length === 0) {
+    return (
+      <div className="multi-round-discussion loading">
+        <div className="loading-placeholder">
+          <div className="spinner"></div>
+          <span>Initializing multi-round discussion...</span>
+        </div>
+      </div>
+    );
+  }
 
   // Helper function to get short model name
   const getModelShortName = (model) => {
@@ -69,82 +90,91 @@ export default function MultiRoundDiscussion({ all_rounds, stage2, final_result,
             {/* Model Responses */}
             <div className="model-responses">
               <h4>Model Responses:</h4>
-              {round.responses.length > 1 && (
-                <div className="model-tabs">
-                  {round.responses.map((response, responseIndex) => (
-                    <button
-                      key={responseIndex}
-                      className={`model-tab ${(selectedModel[index] || 0) === responseIndex ? 'active' : ''}`}
-                      onClick={() => setSelectedModel(prev => ({
-                        ...prev,
-                        [index]: responseIndex
-                      }))}
-                    >
-                      {getModelShortName(response.model)}
-                    </button>
-                  ))}
+              {!round.responses || round.responses.length === 0 ? (
+                <div className="no-responses">
+                  <div className="spinner"></div>
+                  <span>Waiting for model responses...</span>
                 </div>
-              )}
-              <div className="tab-content">
-                {round.responses.map((response, responseIndex) => (
-                  <div
-                    key={responseIndex}
-                    className={`model-response ${(selectedModel[index] || 0) === responseIndex ? 'active' : ''}`}
-                    style={{ display: (selectedModel[index] || 0) === responseIndex ? 'block' : 'none' }}
-                  >
-                    <div className="model-header">
-                      <strong>{response.model}</strong>
+              ) : (
+                <>
+                  {round.responses.length > 1 && (
+                    <div className="model-tabs">
+                      {round.responses.map((response, responseIndex) => (
+                        <button
+                          key={responseIndex}
+                          className={`model-tab ${(selectedModel[index] || 0) === responseIndex ? 'active' : ''}`}
+                          onClick={() => setSelectedModel(prev => ({
+                            ...prev,
+                            [index]: responseIndex
+                          }))}
+                        >
+                          {getModelShortName(response.model)}
+                        </button>
+                      ))}
                     </div>
-                    <div className="response-content">
-                      {response.parsed_json ? (
-                        <div className="json-response">
-                          <div className="json-field">
-                            <strong>Summary:</strong> {response.parsed_json.summary}
-                          </div>
-                          <div className="json-field">
-                            <strong>Viewpoints:</strong>
-                            <ul>
-                              {response.parsed_json.viewpoints.map((viewpoint, vIndex) => (
-                                <li key={vIndex}>{viewpoint}</li>
-                              ))}
-                            </ul>
-                          </div>
-                          <div className="json-field">
-                            <strong>Conflicts:</strong>
-                            <ul>
-                              {response.parsed_json.conflicts.map((conflict, cIndex) => (
-                                <li key={cIndex}>{conflict}</li>
-                              ))}
-                            </ul>
-                          </div>
-                          <div className="json-field">
-                            <strong>Suggestions:</strong>
-                            <ul>
-                              {response.parsed_json.suggestions.map((suggestion, sIndex) => (
-                                <li key={sIndex}>{suggestion}</li>
-                              ))}
-                            </ul>
-                          </div>
-                          {response.parsed_json.final_answer_candidate && (
-                            <div className="json-field">
-                              <strong>Final Answer Candidate:</strong>
+                  )}
+                  <div className="tab-content">
+                    {round.responses.map((response, responseIndex) => (
+                      <div
+                        key={responseIndex}
+                        className={`model-response ${(selectedModel[index] || 0) === responseIndex ? 'active' : ''}`}
+                        style={{ display: (selectedModel[index] || 0) === responseIndex ? 'block' : 'none' }}
+                      >
+                        <div className="model-header">
+                          <strong>{response.model}</strong>
+                        </div>
+                        <div className="response-content">
+                          {response.parsed_json ? (
+                            <div className="json-response">
+                              <div className="json-field">
+                                <strong>Summary:</strong> {response.parsed_json.summary}
+                              </div>
+                              <div className="json-field">
+                                <strong>Viewpoints:</strong>
+                                <ul>
+                                  {response.parsed_json.viewpoints.map((viewpoint, vIndex) => (
+                                    <li key={vIndex}>{viewpoint}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                              <div className="json-field">
+                                <strong>Conflicts:</strong>
+                                <ul>
+                                  {response.parsed_json.conflicts.map((conflict, cIndex) => (
+                                    <li key={cIndex}>{conflict}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                              <div className="json-field">
+                                <strong>Suggestions:</strong>
+                                <ul>
+                                  {response.parsed_json.suggestions.map((suggestion, sIndex) => (
+                                    <li key={sIndex}>{suggestion}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                              {response.parsed_json.final_answer_candidate && (
+                                <div className="json-field">
+                                  <strong>Final Answer Candidate:</strong>
+                                  <div className="markdown-content">
+                                    <ReactMarkdown>{response.parsed_json.final_answer_candidate}</ReactMarkdown>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="raw-response">
                               <div className="markdown-content">
-                                <ReactMarkdown>{response.parsed_json.final_answer_candidate}</ReactMarkdown>
+                                <ReactMarkdown>{response.response}</ReactMarkdown>
                               </div>
                             </div>
                           )}
                         </div>
-                      ) : (
-                        <div className="raw-response">
-                          <div className="markdown-content">
-                            <ReactMarkdown>{response.response}</ReactMarkdown>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </>
+              )}
             </div>
 
             {/* Chairman Assessment */}

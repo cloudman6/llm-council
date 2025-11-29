@@ -5,15 +5,10 @@ Your task is NOT to implement this yet, but to fully understand and prepare.
 Here is exactly what I need implemented:
 
 ```
-按照 @requirement.md，每一轮所有LLM都回答完毕后，Chairman 都需要：
-- 总结观点：共同点和冲突点
-- 判断是否达成共识
-- 如未收敛，生成下一轮问题
-- 收敛则输出最终答案
-
-实现chairman 的上述功能
-1. 所需的 prompt 可参考 @prompts.md
-2. prompt 中LLM的回答直接使用其JSON格式
+优化 MultiRoundDiscussion.jsx 和 MultiRoundDiscussion.css
+- 标签上不使用 “Divergent Phase” 和 “Convergent Round”，直接用 “Round XX" 表示
+- 在tab "Round XX" 中用二级tab显示每轮模型的回答
+- 目前每轮模型的回答是按顺序依次从上到下排列显示，改成在二级tab中并列显示。布局和风格可参考 Stage1.jsx 和 Stage1.css
 ```
 
 ---

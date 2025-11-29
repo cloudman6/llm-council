@@ -76,7 +76,19 @@ export default function ChatInterface({
                   {msg.loading?.multi_round && (
                     <div className="stage-loading">
                       <div className="spinner"></div>
-                      <span>Running Multi-Round Discussion...</span>
+                      <div className="loading-content">
+                        <span className="loading-message">{msg.loading.current_message || 'Running Multi-Round Discussion...'}</span>
+                        {msg.loading.current_round > 0 && (
+                          <div className="round-progress">
+                            <span>Round {msg.loading.current_round}</span>
+                            {msg.loading.total_models > 0 && (
+                              <span className="model-progress">
+                                ({msg.loading.completed_models}/{msg.loading.total_models} models responded)
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                   {msg.all_rounds && (

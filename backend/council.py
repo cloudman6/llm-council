@@ -29,12 +29,12 @@ async def divergent_phase_responses(user_query: str) -> List[Dict[str, Any]]:
         messages = [{"role": "user", "content": prompt}]
 
         # Log prompt for debugging
-        print(f"\n=== Divergent Phase - Model {i+1}: {model} ===")
-        print(f"Prompt length: {len(prompt)} characters")
-        print("Prompt content:")
-        print("-" * 80)
-        print(prompt)
-        print("-" * 80)
+        print(f"\n=== Divergent Phase - Model {i+1}: {model} ===", flush=True)
+        print(f"Prompt length: {len(prompt)} characters", flush=True)
+        print("Prompt content:", flush=True)
+        print("-" * 80, flush=True)
+        print(prompt, flush=True)
+        print("-" * 80, flush=True)
 
         # Query the model
         response = await query_model(model, messages)
@@ -43,12 +43,12 @@ async def divergent_phase_responses(user_query: str) -> List[Dict[str, Any]]:
             response_text = response.get('content', '')
 
             # Log response for debugging
-            print(f"\n=== Response from {model} ===")
-            print(f"Response length: {len(response_text)} characters")
-            print("Response content:")
-            print("-" * 80)
-            print(response_text)
-            print("-" * 80)
+            print(f"\n=== Response from {model} ===", flush=True)
+            print(f"Response length: {len(response_text)} characters", flush=True)
+            print("Response content:", flush=True)
+            print("-" * 80, flush=True)
+            print(response_text, flush=True)
+            print("-" * 80, flush=True)
 
             # Validate and parse JSON
             parsed_json = validate_and_parse_json(response_text, model)
@@ -592,12 +592,12 @@ async def evaluate_convergence(
     messages = [{"role": "user", "content": chairman_prompt}]
 
     # Log chairman prompt for debugging
-    print(f"\n=== Chairman Prompt (Round {round_number}) ===")
-    print(f"Prompt length: {len(chairman_prompt)} characters")
-    print("Prompt content:")
-    print("-" * 80)
-    print(chairman_prompt)
-    print("-" * 80)
+    print(f"\n=== Chairman Prompt (Round {round_number}) ===", flush=True)
+    print(f"Prompt length: {len(chairman_prompt)} characters", flush=True)
+    print("Prompt content:", flush=True)
+    print("-" * 80, flush=True)
+    print(chairman_prompt, flush=True)
+    print("-" * 80, flush=True)
 
     # Query the chairman model
     response = await query_model(CHAIRMAN_MODEL, messages)
@@ -605,12 +605,12 @@ async def evaluate_convergence(
     # Log chairman response for debugging
     if response is not None:
         response_text = response.get('content', '')
-        print(f"\n=== Chairman Response (Round {round_number}) ===")
-        print(f"Response length: {len(response_text)} characters")
-        print("Response content:")
-        print("-" * 80)
-        print(response_text)
-        print("-" * 80)
+        print(f"\n=== Chairman Response (Round {round_number}) ===", flush=True)
+        print(f"Response length: {len(response_text)} characters", flush=True)
+        print("Response content:", flush=True)
+        print("-" * 80, flush=True)
+        print(response_text, flush=True)
+        print("-" * 80, flush=True)
     else:
         print(f"\n=== Chairman Response (Round {round_number}) ===")
         print("Chairman failed to respond")
@@ -908,3 +908,250 @@ async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
         "model": CHAIRMAN_MODEL,
         "response": chairman_assessment.get("final_integrated_conclusion", "Maximum rounds reached without convergence")
     }, {"converged_round": None}
+
+
+async def run_full_council_stream(user_query: str):
+    """
+    Run the complete multi-round council process with streaming output.
+
+    Args:
+        user_query: The user's question
+
+    Yields:
+        Dict events for each stage of completion
+    """
+    # IMMEDIATE YIELD to avoid timeout - let frontend know we're starting
+    yield {
+        "type": "initializing",
+        "data": {
+            "message": "Initializing multi-round council process...",
+            "user_query": user_query
+        }
+    }
+
+    all_rounds_results = []
+    max_rounds = 5  # Maximum rounds including divergent phase
+
+    # Round 1: Divergent Phase
+    print(f"\n=== Round 1: Divergent Phase ===")
+
+    # Yield round start event
+    yield {
+        "type": "round_start",
+        "data": {
+            "round": 1,
+            "type": "divergent",
+            "message": "Starting divergent phase - gathering initial perspectives..."
+        }
+    }
+
+    # Process models one by one for streaming individual responses
+    accumulated_responses = []
+    divergent_results = []
+
+    for i, model in enumerate(COUNCIL_MODELS):
+        # Build prompt with accumulated context
+        prompt = build_divergent_prompt(user_query, accumulated_responses)
+        messages = [{"role": "user", "content": prompt}]
+
+        # Query the model
+        response = await query_model(model, messages)
+
+        if response is not None:
+            response_text = response.get('content', '')
+            parsed_json = validate_and_parse_json(response_text, model)
+
+            result = {
+                "model": model,
+                "response": response_text,
+                "parsed_json": parsed_json
+            }
+
+            divergent_results.append(result)
+            accumulated_responses.append(result)
+
+            # Yield individual model response
+            yield {
+                "type": "model_response_complete",
+                "data": {
+                    "round": 1,
+                    "model": model,
+                    "response": response_text,
+                    "parsed_json": parsed_json,
+                    "completed_models": i + 1,
+                    "total_models": len(COUNCIL_MODELS)
+                }
+            }
+
+    # If no models responded successfully, send error
+    if not divergent_results:
+        yield {
+            "type": "error",
+            "message": "All models failed to respond. Please try again."
+        }
+        return
+
+    # Add round to results
+    round_data = {
+        "round": 1,
+        "type": "divergent",
+        "responses": divergent_results
+    }
+    all_rounds_results.append(round_data)
+
+    # Evaluate convergence after divergent phase
+    chairman_assessment = await evaluate_convergence(user_query, divergent_results, 1)
+
+    # Add chairman assessment to results
+    round_data["chairman_assessment"] = chairman_assessment
+
+    # Yield round complete event
+    yield {
+        "type": "round_complete",
+        "data": {
+            "round": 1,
+            "type": "divergent",
+            "responses": divergent_results,
+            "chairman_assessment": chairman_assessment,
+            "is_converged": chairman_assessment.get("is_converged", False),
+            "convergence_score": chairman_assessment.get("convergence_score", 0.0)
+        }
+    }
+
+    # Check if converged after divergent phase
+    if chairman_assessment.get("is_converged", False):
+        print(f"\n=== Converged after divergent phase ===")
+        final_result = {
+            "model": CHAIRMAN_MODEL,
+            "response": chairman_assessment.get("final_integrated_conclusion", "")
+        }
+
+        yield {
+            "type": "complete",
+            "data": {
+                "all_rounds": all_rounds_results,
+                "stage2": [],  # No stage2 in multi-round format
+                "final_result": final_result,
+                "metadata": {"converged_round": 1}
+            }
+        }
+        return
+
+    # Continue with convergent phases
+    current_round = 2
+    while current_round <= max_rounds:
+        print(f"\n=== Round {current_round}: Convergent Phase ===")
+
+        # Yield round start event
+        yield {
+            "type": "round_start",
+            "data": {
+                "round": current_round,
+                "type": "convergent",
+                "message": f"Starting convergent phase round {current_round}..."
+            }
+        }
+
+        # Run convergent phase with streaming
+        convergent_results = []
+        prompt = build_convergent_prompt(
+            user_query,
+            chairman_assessment["consensus_points"],
+            chairman_assessment["conflict_points"],
+            chairman_assessment["questions_for_next_round"]
+        )
+        messages = [{"role": "user", "content": prompt}]
+
+        # Query models in parallel but stream individual results
+        responses = await query_models_parallel(COUNCIL_MODELS, messages)
+
+        for i, (model, response) in enumerate(responses.items()):
+            if response is not None:
+                response_text = response.get('content', '')
+                parsed_json = validate_and_parse_json(response_text, model)
+
+                result = {
+                    "model": model,
+                    "response": response_text,
+                    "parsed_json": parsed_json
+                }
+
+                convergent_results.append(result)
+
+                # Yield individual model response
+                yield {
+                    "type": "model_response_complete",
+                    "data": {
+                        "round": current_round,
+                        "model": model,
+                        "response": response_text,
+                        "parsed_json": parsed_json,
+                        "completed_models": i + 1,
+                        "total_models": len([r for r in responses.values() if r is not None])
+                    }
+                }
+
+        # Add round to results
+        round_data = {
+            "round": current_round,
+            "type": "convergent",
+            "responses": convergent_results
+        }
+        all_rounds_results.append(round_data)
+
+        # Evaluate convergence
+        chairman_assessment = await evaluate_convergence(user_query, convergent_results, current_round)
+
+        # Add chairman assessment to results
+        round_data["chairman_assessment"] = chairman_assessment
+
+        # Yield round complete event
+        yield {
+            "type": "round_complete",
+            "data": {
+                "round": current_round,
+                "type": "convergent",
+                "responses": convergent_results,
+                "chairman_assessment": chairman_assessment,
+                "is_converged": chairman_assessment.get("is_converged", False),
+                "convergence_score": chairman_assessment.get("convergence_score", 0.0)
+            }
+        }
+
+        # Check if converged
+        if chairman_assessment.get("is_converged", False):
+            print(f"\n=== Converged after round {current_round} ===")
+            final_result = {
+                "model": CHAIRMAN_MODEL,
+                "response": chairman_assessment.get("final_integrated_conclusion", "")
+            }
+
+            yield {
+                "type": "complete",
+                "data": {
+                    "all_rounds": all_rounds_results,
+                    "stage2": [],  # No stage2 in multi-round format
+                    "final_result": final_result,
+                    "metadata": {"converged_round": current_round}
+                }
+            }
+            return
+
+        current_round += 1
+
+    # If reached max rounds without convergence
+    print(f"\n=== Reached maximum rounds ({max_rounds}) without convergence ===")
+    final_result = {
+        "model": CHAIRMAN_MODEL,
+        "response": chairman_assessment.get("final_integrated_conclusion", "Maximum rounds reached without convergence")
+    }
+
+    yield {
+        "type": "complete",
+        "data": {
+            "all_rounds": all_rounds_results,
+            "stage2": [],  # No stage2 in multi-round format
+            "final_result": final_result,
+            "metadata": {"converged_round": None}
+        }
+    }
