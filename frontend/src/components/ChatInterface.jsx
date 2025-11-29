@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import MultiRoundDiscussion from './MultiRoundDiscussion';
-import Stage2 from './Stage2';
-import Stage3 from './Stage3';
 import './ChatInterface.css';
 
 export default function ChatInterface({
@@ -94,23 +92,10 @@ export default function ChatInterface({
                   {msg.all_rounds && (
                     <MultiRoundDiscussion
                       all_rounds={msg.all_rounds}
-                      stage2={msg.stage2}
                       final_result={msg.final_result}
                       metadata={msg.metadata}
                     />
                   )}
-
-                  {/* Stage 2 (for backward compatibility) */}
-                  {msg.stage2 && (
-                    <Stage2
-                      rankings={msg.stage2}
-                      labelToModel={msg.metadata?.label_to_model}
-                      aggregateRankings={msg.metadata?.aggregate_rankings}
-                    />
-                  )}
-
-                  {/* Stage 3 (for backward compatibility) */}
-                  {msg.stage3 && <Stage3 finalResponse={msg.stage3} />}
                 </div>
               )}
             </div>

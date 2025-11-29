@@ -41,15 +41,15 @@ async def test_role_free():
 
     # Run the council process
     print("\n--- Running Divergent Phase ---")
-    divergent_results, stage2_results, stage3_result, metadata = await run_full_council(test_query)
+    all_rounds_results, final_result, metadata = await run_full_council(test_query)
 
     print(f"\nResults:")
-    print(f"- Divergent phase results: {len(divergent_results)} responses")
-    print(f"- Stage 2 results: {len(stage2_results)} rankings")
-    print(f"- Stage 3 result: {stage3_result['model']} - {stage3_result['response'][:50]}...")
+    print(f"- Total rounds: {len(all_rounds_results)}")
+    print(f"- Final result: {final_result['model']} - {final_result['response'][:50]}...")
 
     # Show divergent phase details
-    if divergent_results:
+    if all_rounds_results and len(all_rounds_results) > 0:
+        divergent_results = all_rounds_results[0]['responses']
         print("\nDivergent Phase Details:")
         for i, result in enumerate(divergent_results, 1):
             print(f"\nModel {i}: {result['model']}")

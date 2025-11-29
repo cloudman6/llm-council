@@ -5,7 +5,7 @@ import './MultiRoundDiscussion.css';
 /**
  * Component to display multi-round discussion results
  */
-export default function MultiRoundDiscussion({ all_rounds, stage2, final_result, metadata }) {
+export default function MultiRoundDiscussion({ all_rounds, final_result, metadata }) {
   const [selectedRound, setSelectedRound] = useState(0);
   const [selectedModel, setSelectedModel] = useState({});
 

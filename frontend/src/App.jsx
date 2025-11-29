@@ -73,7 +73,6 @@ function App() {
       const assistantMessage = {
         role: 'assistant',
         all_rounds: [],
-        stage2: null,
         final_result: null,
         metadata: null,
         loading: {
@@ -179,7 +178,6 @@ function App() {
                 const messages = [...prev.messages];
                 const lastMsg = messages[messages.length - 1];
                 lastMsg.all_rounds = event.data.all_rounds;
-                lastMsg.stage2 = event.data.stage2;
                 lastMsg.final_result = event.data.final_result;
                 lastMsg.metadata = event.data.metadata;
                 lastMsg.loading.multi_round = false;

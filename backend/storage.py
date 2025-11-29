@@ -130,7 +130,6 @@ def add_user_message(conversation_id: str, content: str):
 def add_assistant_message(
     conversation_id: str,
     all_rounds: List[Dict[str, Any]],
-    stage2: List[Dict[str, Any]],
     final_result: Dict[str, Any]
 ):
     """
@@ -139,19 +138,20 @@ def add_assistant_message(
     Args:
         conversation_id: Conversation identifier
         all_rounds: List of all rounds with responses and chairman assessments
-        stage2: List of model rankings (for backward compatibility)
         final_result: Final synthesized response
     """
     conversation = get_conversation(conversation_id)
     if conversation is None:
         raise ValueError(f"Conversation {conversation_id} not found")
 
-    conversation["messages"].append({
+    # Create assistant message with all the LLM responses and chairman assessments
+    assistant_message = {
         "role": "assistant",
         "all_rounds": all_rounds,
-        "stage2": stage2,
         "final_result": final_result
-    })
+    }
+
+    conversation["messages"].append(assistant_message)
 
     save_conversation(conversation)
 

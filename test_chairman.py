@@ -23,7 +23,7 @@ async def test_chairman():
 
     try:
         # Run the multi-round council process
-        all_rounds_results, stage2_results, final_result, metadata = await run_full_council(test_question)
+        all_rounds_results, final_result, metadata = await run_full_council(test_question)
 
         print(f"\nTotal rounds completed: {len(all_rounds_results)}")
         print(f"Converged in round: {metadata.get('converged_round', 'Not converged')}")

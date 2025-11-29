@@ -10,7 +10,7 @@ import json
 import asyncio
 
 from . import storage
-from .council import run_full_council, run_full_council_stream, generate_conversation_title, divergent_phase_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
+from .council import run_full_council_stream, generate_conversation_title
 
 app = FastAPI(title="LLM Council API")
 
@@ -79,48 +79,6 @@ async def get_conversation(conversation_id: str):
     return conversation
 
 
-@app.post("/api/conversations/{conversation_id}/message")
-async def send_message(conversation_id: str, request: SendMessageRequest):
-    """
-    Send a message and run the 3-stage council process.
-    Returns the complete response with all stages.
-    """
-    # Check if conversation exists
-    conversation = storage.get_conversation(conversation_id)
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-
-    # Check if this is the first message
-    is_first_message = len(conversation["messages"]) == 0
-
-    # Add user message
-    storage.add_user_message(conversation_id, request.content)
-
-    # If this is the first message, generate a title
-    if is_first_message:
-        title = await generate_conversation_title(request.content)
-        storage.update_conversation_title(conversation_id, title)
-
-    # Run the multi-round council process
-    all_rounds_results, stage2_results, final_result, metadata = await run_full_council(
-        request.content
-    )
-
-    # Add assistant message with all rounds
-    storage.add_assistant_message(
-        conversation_id,
-        all_rounds_results,
-        stage2_results,
-        final_result
-    )
-
-    # Return the complete response with metadata
-    return {
-        "all_rounds": all_rounds_results,
-        "stage2": stage2_results,
-        "final_result": final_result,
-        "metadata": metadata
-    }
 
 
 @app.post("/api/conversations/{conversation_id}/message/stream")
@@ -147,9 +105,24 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             if is_first_message:
                 title_task = asyncio.create_task(generate_conversation_title(request.content))
 
+            # Track final results for storage
+            final_results_data = None
+
             # Run the multi-round council process with streaming
             async for event in run_full_council_stream(request.content):
+                # Capture final_results event for storage
+                if event.get('type') == 'final_results':
+                    final_results_data = event.get('data')
+
                 yield f"data: {json.dumps(event)}\n\n"
+
+            # Save assistant message to storage if final results are available
+            if final_results_data:
+                storage.add_assistant_message(
+                    conversation_id,
+                    final_results_data["all_rounds"],
+                    final_results_data["final_result"]
+                )
 
             # Wait for title generation if it was started
             if title_task:

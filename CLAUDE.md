@@ -4,7 +4,7 @@ This file contains technical details, architectural decisions, and important imp
 
 ## Project Overview
 
-LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively answer user questions. The key innovation is anonymized peer review in Stage 2, preventing models from playing favorites.
+LLM Council is a multi-round deliberation system where multiple LLMs collaboratively answer user questions through iterative discussion phases. The system uses a chairman model to assess convergence and guide the discussion process.
 
 ## Architecture
 
@@ -23,27 +23,25 @@ LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively
 - Graceful degradation: returns None on failure, continues with successful responses
 
 **`council.py`** - The Core Logic
-- `stage1_collect_responses()`: Parallel queries to all council models
-- `stage2_collect_rankings()`:
-  - Anonymizes responses as "Response A, B, C, etc."
-  - Creates `label_to_model` mapping for de-anonymization
-  - Prompts models to evaluate and rank (with strict format requirements)
-  - Returns tuple: (rankings_list, label_to_model_dict)
-  - Each ranking includes both raw text and `parsed_ranking` list
-- `stage3_synthesize_final()`: Chairman synthesizes from all responses + rankings
-- `parse_ranking_from_text()`: Extracts "FINAL RANKING:" section, handles both numbered lists and plain format
-- `calculate_aggregate_rankings()`: Computes average rank position across all peer evaluations
+- `divergent_phase_responses()`: Sequential responses where each model sees all previous responses
+- `evaluate_convergence()`: Chairman assesses convergence and generates questions for next round
+- `run_convergent_phase()`: Parallel responses to chairman's questions
+- `build_divergent_prompt()`: Builds prompt for divergent phase with accumulated context
+- `build_convergent_prompt()`: Builds prompt for convergent phase based on chairman's assessment
+- `run_full_council()`: Runs complete multi-round council process (batch mode)
+- `run_full_council_stream()`: Runs complete multi-round council process with streaming output
 
 **`storage.py`**
 - JSON-based conversation storage in `data/conversations/`
 - Each conversation: `{id, created_at, messages[]}`
-- Assistant messages contain: `{role, stage1, stage2, stage3}`
-- Note: metadata (label_to_model, aggregate_rankings) is NOT persisted to storage, only returned via API
+- Assistant messages contain: `{role, all_rounds, final_result}`
+- Note: metadata (converged_round) is persisted to storage
 
 **`main.py`**
 - FastAPI app with CORS enabled for localhost:5173 and localhost:3000
-- POST `/api/conversations/{id}/message` returns metadata in addition to stages
-- Metadata includes: label_to_model mapping and aggregate_rankings
+- POST `/api/conversations/{id}/message` returns all rounds and final result
+- POST `/api/conversations/{id}/message/stream` streams multi-round process with real-time updates
+- Metadata includes: converged_round indicating which round achieved convergence
 
 ### Frontend Structure (`frontend/src/`)
 
@@ -57,20 +55,17 @@ LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively
 - Enter to send, Shift+Enter for new line
 - User messages wrapped in markdown-content class for padding
 
-**`components/Stage1.jsx`**
-- Tab view of individual model responses
-- ReactMarkdown rendering with markdown-content wrapper
+**`components/MultiRoundDiscussion.jsx`**
+- Tab-based UI showing all discussion rounds
+- Each round displays model responses and chairman assessment
+- Real-time convergence status and scores
+- Interactive model selection within each round
+- Final integrated conclusion when converged
 
-**`components/Stage2.jsx`**
-- **Critical Feature**: Tab view showing RAW evaluation text from each model
-- De-anonymization happens CLIENT-SIDE for display (models receive anonymous labels)
-- Shows "Extracted Ranking" below each evaluation so users can validate parsing
-- Aggregate rankings shown with average position and vote count
-- Explanatory text clarifies that boldface model names are for readability only
-
-**`components/Stage3.jsx`**
-- Final synthesized answer from chairman
-- Green-tinted background (#f0fff0) to highlight conclusion
+**`components/DivergentPhase.jsx`**
+- Displays divergent phase responses with structured JSON parsing
+- Shows summary, viewpoints, conflicts, and suggestions
+- Final answer candidate with markdown rendering
 
 **Styling (`*.css`)**
 - Light mode theme (not dark mode)
@@ -80,23 +75,17 @@ LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively
 
 ## Key Design Decisions
 
-### Stage 2 Prompt Format
-The Stage 2 prompt is very specific to ensure parseable output:
-```
-1. Evaluate each response individually first
-2. Provide "FINAL RANKING:" header
-3. Numbered list format: "1. Response C", "2. Response A", etc.
-4. No additional text after ranking section
-```
+### Multi-Round Discussion Process
+- **Divergent Phase**: Models respond sequentially, building on previous responses to explore diverse perspectives
+- **Convergent Phase**: Models respond in parallel to chairman's questions to resolve conflicts and reach consensus
+- **Chairman Assessment**: After each round, chairman evaluates convergence and guides next steps
+- **Iterative Process**: Continues until convergence is achieved or maximum rounds reached
 
-This strict format allows reliable parsing while still getting thoughtful evaluations.
-
-### De-anonymization Strategy
-- Models receive: "Response A", "Response B", etc.
-- Backend creates mapping: `{"Response A": "openai/gpt-5.1", ...}`
-- Frontend displays model names in **bold** for readability
-- Users see explanation that original evaluation used anonymous labels
-- This prevents bias while maintaining transparency
+### Role-Free Implementation
+- Models don't have predefined roles (innovator, critic, etc.)
+- Each model contributes naturally based on the accumulated discussion context
+- This allows more organic and emergent discussion dynamics
+- Models build on each other's insights without artificial constraints
 
 ### Error Handling Philosophy
 - Continue with successful responses if some models fail (graceful degradation)
@@ -129,8 +118,9 @@ Models are hardcoded in `backend/config.py`. Chairman can be same or different f
 
 1. **Module Import Errors**: Always run backend as `python -m backend.main` from project root, not from backend directory
 2. **CORS Issues**: Frontend must match allowed origins in `main.py` CORS middleware
-3. **Ranking Parse Failures**: If models don't follow format, fallback regex extracts any "Response X" patterns in order
-4. **Missing Metadata**: Metadata is ephemeral (not persisted), only available in API responses
+3. **JSON Parsing Failures**: If models don't follow JSON format, fallback to raw response display
+4. **Streaming Data Persistence**: Ensure streaming API properly saves all discussion data to storage
+5. **Convergence Detection**: Chairman model must be reliable for convergence assessment
 
 ## Future Enhancement Ideas
 
@@ -150,17 +140,19 @@ Use `test_openrouter.py` to verify API connectivity and test different model ide
 ```
 User Query
     ↓
-Stage 1: Parallel queries → [individual responses]
+Round 1: Divergent Phase (sequential responses with accumulated context)
     ↓
-Stage 2: Anonymize → Parallel ranking queries → [evaluations + parsed rankings]
+Chairman Assessment: Evaluate convergence and generate questions
     ↓
-Aggregate Rankings Calculation → [sorted by avg position]
+If not converged: Round 2+ Convergent Phase (parallel responses to questions)
     ↓
-Stage 3: Chairman synthesis with full context
+Repeat until convergence or max rounds
     ↓
-Return: {stage1, stage2, stage3, metadata}
+Final Integrated Conclusion from chairman
     ↓
-Frontend: Display with tabs + validation UI
+Return: {all_rounds, final_result, metadata}
+    ↓
+Frontend: Multi-round tabbed interface with real-time progress
 ```
 
 The entire flow is async/parallel where possible to minimize latency.

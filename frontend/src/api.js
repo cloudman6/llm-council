@@ -46,26 +46,7 @@ export const api = {
     return response.json();
   },
 
-  /**
-   * Send a message in a conversation.
-   */
-  async sendMessage(conversationId, content) {
-    const response = await fetch(
-      `${API_BASE}/api/conversations/${conversationId}/message`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content }),
-      }
-    );
-    if (!response.ok) {
-      throw new Error('Failed to send message');
-    }
-    return response.json();
-  },
-
+  
   /**
    * Send a message and receive streaming updates.
    * @param {string} conversationId - The conversation ID
