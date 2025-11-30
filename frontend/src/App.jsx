@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
+import ConfirmDialog from './components/ConfirmDialog';
 import { api } from './api';
 import './App.css';
 
@@ -9,6 +10,10 @@ function App() {
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState({
+    isOpen: false,
+    conversationId: null,
+  });
 
   const loadConversations = async () => {
     try {
@@ -55,6 +60,50 @@ function App() {
 
   const handleSelectConversation = (id) => {
     setCurrentConversationId(id);
+  };
+
+  const handleDeleteConversation = (id, event) => {
+    // Stop the event from bubbling up to avoid triggering the conversation selection
+    event.stopPropagation();
+
+    // Show custom confirmation dialog
+    setDeleteDialog({
+      isOpen: true,
+      conversationId: id,
+    });
+  };
+
+  const confirmDeleteConversation = async () => {
+    const { conversationId } = deleteDialog;
+
+    try {
+      await api.deleteConversation(conversationId);
+
+      // If the deleted conversation was currently selected, clear the selection
+      if (currentConversationId === conversationId) {
+        setCurrentConversationId(null);
+        setCurrentConversation(null);
+      }
+
+      // Reload conversations list
+      await loadConversations();
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+      alert('Failed to delete conversation. Please try again.');
+    } finally {
+      // Close the dialog
+      setDeleteDialog({
+        isOpen: false,
+        conversationId: null,
+      });
+    }
+  };
+
+  const cancelDeleteConversation = () => {
+    setDeleteDialog({
+      isOpen: false,
+      conversationId: null,
+    });
   };
 
   const handleSendMessage = async (content) => {
@@ -240,11 +289,21 @@ function App() {
         currentConversationId={currentConversationId}
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
+        onDeleteConversation={handleDeleteConversation}
       />
       <ChatInterface
         conversation={currentConversation}
         onSendMessage={handleSendMessage}
         isLoading={isLoading}
+      />
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        title="Delete Conversation"
+        message="Are you sure you want to delete this conversation? This action cannot be undone."
+        onConfirm={confirmDeleteConversation}
+        onCancel={cancelDeleteConversation}
+        confirmText="Delete"
+        cancelText="Cancel"
       />
     </div>
   );
