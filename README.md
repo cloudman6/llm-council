@@ -2,23 +2,62 @@
 
 ![llmcouncil](header.jpg)
 
-The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, eg.c), you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it uses OpenRouter to send your query to multiple LLMs, it then asks them to review and rank each other's work, and finally a Chairman LLM produces the final response.
+A sophisticated multi-LLM collaborative deliberation system that enables multiple large language models to engage in structured discussions, debate perspectives, and converge on high-quality consensus answers through iterative reasoning.
 
-In a bit more detail, here is what happens when you submit a query:
+Instead of querying a single LLM provider, LLM Council creates a "council" of diverse AI models that collaborate through a structured multi-round process. Each model contributes unique perspectives, identifies conflicts and consensus points, and works together under the guidance of a Chairman model to produce comprehensive, well-reasoned responses.
 
-1. **Stage 1: First opinions**. The user query is given to all LLMs individually, and the responses are collected. The individual responses are shown in a "tab view", so that the user can inspect them all one by one.
-2. **Stage 2: Review**. Each individual LLM is given the responses of the other LLMs. Under the hood, the LLM identities are anonymized so that the LLM can't play favorites when judging their outputs. The LLM is asked to rank them in accuracy and insight.
-3. **Stage 3: Final response**. The designated Chairman of the LLM Council takes all of the model's responses and compiles them into a single final answer that is presented to the user.
+## How It Works
 
-## Vibe Code Alert
+The system uses a sophisticated **divergent → convergent** discussion process:
 
-This project was 99% vibe coded as a fun Saturday hack because I wanted to explore and evaluate a number of LLMs side by side in the process of [reading books together with LLMs](https://x.com/karpathy/status/1990577951671509438). It's nice and useful to see multiple responses side by side, and also the cross-opinions of all LLMs on each other's outputs. I'm not going to support it in any way, it's provided here as is for other people's inspiration and I don't intend to improve it. Code is ephemeral now and libraries are over, ask your LLM to change it in whatever way you like.
+### 🌱 **Round 1: Divergent Phase**
+- Models respond sequentially, building on previous responses
+- Each model sees all preceding responses, creating a chain of evolving perspectives
+- Goal: Maximize viewpoint diversity and uncover different angles
+
+### 🔍 **Chairman Assessment**
+- After each round, the Chairman analyzes responses for:
+  - **Consensus Points**: Areas of agreement and shared understanding
+  - **Conflict Points**: Disagreements requiring further exploration
+  - **Convergence Score**: 0.0-1.0 rating of discussion stability
+- Generates targeted questions for the next round if needed
+
+### 🎯 **Round 2+: Convergent Phase**
+- Models respond independently to Chairman's questions
+- Deep analysis of previous consensus and conflict points
+- Structured evaluation across multiple dimensions
+- Goal: Resolve conflicts, strengthen consensus, and stabilize discussion framework
+
+### ✅ **Final Integration**
+- When convergence is achieved (score ≥0.85), the Chairman synthesizes:
+  - Integrated conclusion incorporating all perspectives
+  - Acknowledgment of remaining disagreements
+  - Comprehensive answer with reasoning transparency
+
+## Key Features
+
+- **Multi-round Deliberation**: Iterative refinement until consensus is reached
+- **Intelligent Convergence Detection**: Sophisticated assessment of discussion stability
+- **Complete Transparency**: Inspect all model responses, and reasoning
+- **Robust Error Handling**: Continues even if some models fail
+
+## Current Configuration
+
+The system is currently configured with free-tier models for accessibility:
+
+**Council Members:**
+- `z-ai/glm-4.5-air:free` - General reasoning and analysis
+- `x-ai/grok-4.1-fast:free` - Fast responses with diverse perspectives
+- `tngtech/deepseek-r1t2-chimera:free` - Deep reasoning capabilities
+- `kwaipilot/kat-coder-pro:free` - Technical and analytical insights
+
+**Chairman:** `z-ai/glm-4.5-air:free` - Manages discussion flow and synthesizes final answers
 
 ## Setup
 
 ### 1. Install Dependencies
 
-The project uses [uv](https://docs.astral.sh/uv/) for project management.
+The project uses [uv](https://docs.astral.sh/uv/) for Python dependency management.
 
 **Backend:**
 ```bash
@@ -40,7 +79,7 @@ Create a `.env` file in the project root:
 OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-Get your API key at [openrouter.ai](https://openrouter.ai/). Make sure to purchase the credits you need, or sign up for automatic top up.
+Get your API key at [openrouter.ai](https://openrouter.ai/). Purchase credits or set up automatic top-up.
 
 ### 3. Configure Models (Optional)
 
@@ -79,9 +118,32 @@ npm run dev
 
 Then open http://localhost:5173 in your browser.
 
-## Tech Stack
+## Architecture & Tech Stack
 
-- **Backend:** FastAPI (Python 3.10+), async httpx, OpenRouter API
-- **Frontend:** React + Vite, react-markdown for rendering
-- **Storage:** JSON files in `data/conversations/`
-- **Package Management:** uv for Python, npm for JavaScript
+### Backend (Port 8001)
+- **Framework:** FastAPI with async support
+- **Core Logic:** Sophisticated multi-round discussion management
+- **API Client:** Robust HTTPX-based OpenRouter integration
+- **Streaming:** Server-Sent Events for real-time progress updates
+- **Storage:** JSON-based conversation persistence
+- **Error Handling:** Graceful degradation with partial failures
+- **Package Management:** uv for Python dependencies
+
+### Frontend (Port 5173)
+- **Framework:** React 19.2.0 with modern hooks
+- **Build Tool:** Vite 7.2.4 for fast development
+- **UI Features:**
+  - Real-time streaming interface with progress tracking
+  - Tab-based multi-round discussion navigation
+  - Interactive model selection and response inspection
+  - Conversation management with delete functionality
+  - Modern confirmation dialogs with keyboard shortcuts
+- **Rendering:** ReactMarkdown for structured content display
+- **Styling:** Modern CSS with responsive design
+
+### Advanced Features
+- **Intelligent Convergence Detection:** 4-dimension evaluation system
+- **Deep Analysis Requirements:** Structured consensus and conflict analysis
+- **Chairman Optimization:** Systematic round-by-round comparison analysis
+- **Real-time Updates:** Live streaming of discussion progress
+- **Robust Persistence:** Complete conversation history with metadata
