@@ -68,6 +68,8 @@ async def generate_conversation_title(user_query: str) -> str:
     title_prompt = f"""Generate a very short title (3-5 words maximum) that summarizes the following question.
 The title should be concise and descriptive. Do not use quotes or punctuation in the title.
 
+**IMPORTANT**: The title must be in the same language as the question. If the question is in Chinese, the title should be in Chinese. If the question is in English, the title should be in English, etc.
+
 Question: {user_query}
 
 Title:"""
@@ -104,39 +106,46 @@ def build_divergent_prompt(user_query: str) -> str:
         Formatted prompt string
     """
     # Optimized divergent phase prompt for responses
-    system_prompt = """# 角色与任务
+    system_prompt = """# Role and Task
 
-## 角色定义
-你是多智能体协作系统的 AI 模型，参与发散阶段的讨论。你将独立提供观点，看不到其他模型的想法。
+## Role Definition
+You are an AI model in a multi-agent collaboration system, participating in the divergent phase discussion. You will provide independent viewpoints and cannot see other models' thoughts.
 
-## 核心任务
-- 围绕用户问题提供你独特的观点
-- 从你的角度分析问题，独立思考
-- 使用结构化 JSON 格式输出
+## Core Task
+- Provide your unique perspectives on the user's question
+- Analyze the question from your angle, think independently
+- Use structured JSON format for output
+
+## Language Consistency Requirement
+**IMPORTANT**: The language of your response MUST match the language of the user's question:
+- If the user asks in English, respond in English
+- If the user asks in Chinese (中文), respond in Chinese (中文)
+- If the user asks in any other language, respond in the same language
+- Maintain language consistency throughout your entire response
 
 ---
 
-# 输出格式
+# Output Format
 
-必须严格遵守以下 JSON 格式：
+Must strictly adhere to the following JSON format:
 
 ```json
 {{
-  "summary": "你对问题的思考简述",
-  "viewpoints": ["你的主要观点1", "你的主要观点2", "你的主要观点3", ...],
-  "final_answer_candidate": "基于你的独立分析给出的初步答案"
+  "summary": "Brief description of your thinking on the question",
+  "viewpoints": ["Your main viewpoint 1", "Your main viewpoint 2", "Your main viewpoint 3", ...],
+  "final_answer_candidate": "Preliminary answer based on your independent analysis"
 }}
 ```
 
 ---
 
-# 用户原始问题
+# User's Original Question
 {user_query}
 
 ---
 
-# 开始回答
-请严格按照指定 JSON 格式输出你的独立观点。"""
+# Start Answering
+Please output your independent viewpoints strictly according to the specified JSON format."""
 
     return system_prompt.format(user_query=user_query)
 
@@ -235,175 +244,182 @@ async def evaluate_convergence(
 
         previous_chairman_context = f"""
 
-## 上一轮讨论状态回顾 (第{round_number-1}轮)
+## Previous Round Discussion Status Review (Round {round_number-1})
 
-### 上一轮关键指标
-- **收敛评分**: {prev_score}/1.0
-- **收敛状态**: {prev_converged}
+### Previous Round Key Metrics
+- **Convergence Score**: {prev_score}/1.0
+- **Convergence Status**: {prev_converged}
 
-### 上一轮识别的共识点
-{chr(10).join([f"- {point}" for point in prev_consensus]) if prev_consensus else "- 无明确共识点"}
+### Previous Round Identified Consensus Points
+{chr(10).join([f"- {point}" for point in prev_consensus]) if prev_consensus else "- No clear consensus points"}
 
-### 上一轮识别的主要冲突点
-{chr(10).join([f"- {point}" for point in prev_conflicts]) if prev_conflicts else "- 无显著冲突点"}
+### Previous Round Identified Main Conflict Points
+{chr(10).join([f"- {point}" for point in prev_conflicts]) if prev_conflicts else "- No significant conflict points"}
 
-### 上一轮提出的引导问题
-{chr(10).join([f"{i+1}. {q}" for i, q in enumerate(prev_questions)]) if prev_questions else "- 无特定引导问题"}
+### Previous Round Proposed Guiding Questions
+{chr(10).join([f"{i+1}. {q}" for i, q in enumerate(prev_questions)]) if prev_questions else "- No specific guiding questions"}
 
-### 上一轮收敛分析
+### Previous Round Convergence Analysis
 {prev_explanation}
 
-## 🔍 本轮对比分析要求
+## 🔍 This Round Comparative Analysis Requirements
 
-**在评估本轮讨论时，你必须进行以下对比分析：**
+**When evaluating this round's discussion, you must perform the following comparative analysis:**
 
-### 1. 观点演进对比
-- **对比上一轮共识点**: 本轮是否强化了这些共识？是否有所修正？
-- **对比上一轮冲突点**: 本轮是否解决了这些冲突？是否产生了新的冲突？
-- **新观点识别**: 本轮出现了哪些上一轮没有的新观点或新角度？
+### 1. Viewpoint Evolution Comparison
+- **Compare with previous round consensus points**: Has this round reinforced these consensus points? Have there been modifications?
+- **Compare with previous round conflict points**: Has this round resolved these conflicts? Have new conflicts emerged?
+- **New viewpoint identification**: What new viewpoints or angles have appeared in this round that were not in the previous round?
 
-### 2. 讨论进展评估
-- **问题响应度**: 本轮回复是否有效回应了上一轮提出的引导问题？
-- **收敛轨迹**: 讨论是朝着收敛方向发展还是出现了新的分歧？
-- **深度变化**: 相比上一轮，讨论的深度和广度是否有提升？
+### 2. Discussion Progress Assessment
+- **Question responsiveness**: Have the responses in this round effectively addressed the guiding questions proposed in the previous round?
+- **Convergence trajectory**: Is the discussion moving toward convergence or have new divergences appeared?
+- **Depth change**: Compared to the previous round, has the depth and breadth of the discussion improved?
 
-### 3. 决策依据
-- **稳定性判断**: 本轮相比上一轮是否更加稳定（观点不再大幅变化）？
-- **充分性评估**: 现有的共识点和已解决的冲突点是否足以形成高质量答案？
-- **剩余分歧价值**: 剩余的分歧点是否对最终答案质量有实质性影响？
+### 3. Decision Basis
+- **Stability judgment**: Is this round more stable compared to the previous round (viewpoints no longer changing significantly)?
+- **Sufficiency assessment**: Are the existing consensus points and resolved conflict points sufficient to form a high-quality answer?
+- **Remaining divergence value**: Do the remaining divergence points have a substantial impact on the quality of the final answer?
 
-**特别注意**: 收敛不等于完全一致，而是指讨论框架稳定、分歧明确且可控，能够形成综合性的高质量答案。
+**Special Note**: Convergence does not mean complete agreement, but rather that the discussion framework is stable, divergences are clear and manageable, and a comprehensive high-quality answer can be formed.
 """
 
     # Build optimized chairman prompt with clear structure
-    chairman_prompt = f"""# 角色定义
-你是多智能体协作系统的 Chairman LLM（主持人模型），负责引导讨论进程并评估收敛状态。
+    chairman_prompt = f"""# Role Definition
+You are the Chairman LLM (facilitator model) of a multi-agent collaboration system, responsible for guiding the discussion process and assessing convergence status.
+
+## Language Consistency Requirement
+**IMPORTANT**: The language of your response MUST match the language of the user's question:
+- If the user asks in English, respond in English
+- If the user asks in Chinese (中文), respond in Chinese (中文)
+- If the user asks in any other language, respond in the same language
+- Maintain language consistency throughout your entire response, including all JSON values
 
 ---
 
-# 核心任务
+# Core Tasks
 
-## 1. 内容分析
-- **深度分析**: 分析各 LLM 的最新回复内容，提取核心观点和论证逻辑
-- **对比分析**: 对比上一轮的共识点和冲突点，识别观点演进轨迹
-- **收敛评估**: 判断本轮讨论是否真正"趋于收敛"（稳定化）
+## 1. Content Analysis
+- **Deep Analysis**: Analyze the latest response content from each LLM, extract core viewpoints and argumentation logic
+- **Comparative Analysis**: Compare with previous round's consensus points and conflict points, identify viewpoint evolution trajectories
+- **Convergence Assessment**: Determine whether this round's discussion is truly "converging" (stabilizing)
 
-## 2. 收敛评估标准
+## 2. Convergence Assessment Standards
 
-### 收敛的关键指标（注意：收敛 ≠ 全体同意）
-- **观点稳定性**: 各模型不再提出显著新的关键观点，讨论框架趋于稳定
-- **分歧清晰性**: 剩余分歧具体、明确且可管理，不再扩散到新的领域
-- **结构完整性**: 讨论形成了稳定的知识框架（明确共识点 + 清晰分歧点）
-- **答案充分性**: 现有信息足以生成高质量、综合性的答案
+### Key Indicators of Convergence (Note: Convergence ≠ Complete Agreement)
+- **Viewpoint Stability**: Models no longer propose significant new key viewpoints, discussion framework tends toward stability
+- **Divergence Clarity**: Remaining divergences are specific, clear and manageable, no longer spreading to new areas
+- **Structural Integrity**: Discussion has formed a stable knowledge framework (clear consensus points + clear divergence points)
+- **Answer Sufficiency**: Existing information is sufficient to generate high-quality, comprehensive answers
 
-### 收敛评估的具体维度（综合评分 0-1）
+### Specific Dimensions for Convergence Assessment (Comprehensive Score 0-1)
 
-#### 维度1：观点演进稳定性 (25%)
-- **对比上一轮**: 本轮相比上一轮是否出现显著的新观点？
-- **创新度**: 新出现的观点是实质性创新还是边际补充？
-- **收敛迹象**: 观点变化是否趋于平缓？
+#### Dimension 1: Viewpoint Evolution Stability (25%)
+- **Compare with previous round**: Have significant new viewpoints appeared in this round compared to the previous round?
+- **Innovation degree**: Are new viewpoints substantive innovations or marginal supplements?
+- **Convergence signs**: Are viewpoint changes becoming gradual?
 
-#### 维度2：分歧管理效果 (25%)
-- **冲突解决**: 本轮是否有效解决了上一轮识别的关键冲突点？
-- **新冲突涌现**: 是否出现了重要的新分歧领域？
-- **分歧质量**: 剩余分歧是否具有实质性价值，还是细节差异？
+#### Dimension 2: Divergence Management Effectiveness (25%)
+- **Conflict resolution**: Has this round effectively resolved the key conflict points identified in the previous round?
+- **New conflict emergence**: Have important new areas of divergence appeared?
+- **Divergence quality**: Do remaining divergences have substantive value, or are they detailed differences?
 
-#### 维度3：讨论结构化程度 (25%)
-- **框架稳定性**: 讨论是否形成了相对稳定的分析框架？
-- **逻辑完整性**: 关键议题是否都得到了充分讨论？
-- **层次清晰度**: 共识点和分歧点的层次关系是否明确？
+#### Dimension 3: Discussion Structuring Level (25%)
+- **Framework stability**: Has the discussion formed a relatively stable analytical framework?
+- **Logical completeness**: Have key topics been adequately discussed?
+- **Hierarchical clarity**: Are the hierarchical relationships between consensus points and divergence points clear?
 
-#### 维度4：综合答案质量 (25%)
-- **信息充分性**: 当前讨论内容是否足以支撑高质量答案？
-- **平衡性**: 是否涵盖了问题的主要方面和不同角度？
-- **实用性**: 基于现有讨论能否提供有价值的指导或结论？
+#### Dimension 4: Comprehensive Answer Quality (25%)
+- **Information sufficiency**: Is current discussion content sufficient to support a high-quality answer?
+- **Balance**: Does it cover the main aspects and different angles of the question?
+- **Practicality**: Can valuable guidance or conclusions be provided based on existing discussion?
 
-## 3. 决策输出机制
-- **若已收敛**: 必须输出最终综合结论，整合共识点并客观反映分歧点
-- **若未收敛**: 必须生成针对下一轮的具体引导问题，聚焦于未解决的关键分歧
+## 3. Decision Output Mechanism
+- **If converged**: Must output final comprehensive conclusion, integrate consensus points and objectively reflect divergence points
+- **If not converged**: Must generate specific guiding questions for the next round, focusing on unresolved key divergences
 
 ---
 
-# 输出格式
+# Output Format
 
-## 必须严格遵守以下 JSON 格式：
+## Must strictly adhere to the following JSON format:
 
 ```json
 {{
   "convergence_score": 0.0-1.0,
   "is_converged": true/false,
-  "consensus_points": ["共识点1", "共识点2", ...],
-  "conflict_points": ["冲突点1", "冲突点2", ...],
-  "explanation": "为什么你判断已/未收敛",
-  "questions_for_next_round": ["问题1", "问题2", "问题3", ...],
-  "final_integrated_conclusion": "如果需要停止讨论，请给出最终综合答案"
+  "consensus_points": ["Consensus point 1", "Consensus point 2", ...],
+  "conflict_points": ["Conflict point 1", "Conflict point 2", ...],
+  "explanation": "Why you judge it as converged/not converged",
+  "questions_for_next_round": ["Question 1", "Question 2", "Question 3", ...],
+  "final_integrated_conclusion": "If discussion needs to stop, provide final comprehensive answer"
 }}
 ```
 
-## 输出规则
-- 若 `is_converged = true` → 必须输出高质量的 `final_integrated_conclusion`
-- 若 `is_converged = false` → 必须输出精准的 `questions_for_next_round`
+## Output Rules
+- If `is_converged = true` → Must output high-quality `final_integrated_conclusion`
+- If `is_converged = false` → Must output precise `questions_for_next_round`
 
 ---
 
-# 分析方法论
+# Analysis Methodology
 
-## 对比分析流程
-**必须按照以下步骤进行系统性对比分析：**
+## Comparative Analysis Process
+**Must perform systematic comparative analysis following these steps:**
 
-### Step 1: 上一轮状态回顾（如果有）
-- 重新审视上一轮的共识点、冲突点和引导问题
-- 评估上一轮的收敛评分和判断依据
+### Step 1: Previous Round Status Review (if available)
+- Re-examine the previous round's consensus points, conflict points, and guiding questions
+- Evaluate the previous round's convergence score and judgment basis
 
-### Step 2: 本轮内容解析
-- 提取每个模型的核心观点和论证逻辑
-- 识别本轮新出现的观点、证据或角度
+### Step 2: Current Round Content Analysis
+- Extract each model's core viewpoints and argumentation logic
+- Identify new viewpoints, evidence, or angles that appeared in this round
 
-### Step 3: 演进轨迹分析
-- **共识演进**: 上一轮的共识点在本轮是否得到强化、修正或挑战？
-- **冲突管理**: 上一轮的冲突点是否得到解决、深化或转化？
-- **新贡献评估**: 本轮的新观点是否具有实质性价值？
+### Step 3: Evolution Trajectory Analysis
+- **Consensus evolution**: Have the previous round's consensus points been reinforced, modified, or challenged in this round?
+- **Conflict management**: Have the previous round's conflict points been resolved, deepened, or transformed?
+- **New contribution assessment**: Do the new viewpoints in this round have substantive value?
 
-### Step 4: 收敛状态判断
-- **稳定性评估**: 相比上一轮，讨论是否更加稳定？
-- **充分性判断**: 现有讨论是否足以支撑高质量答案？
-- **分歧价值评估**: 剩余分歧是否对答案质量有实质性影响？
+### Step 4: Convergence State Judgment
+- **Stability assessment**: Compared to the previous round, is the discussion more stable?
+- **Sufficiency judgment**: Is the existing discussion sufficient to support a high-quality answer?
+- **Divergence value assessment**: Do the remaining divergences have a substantive impact on answer quality?
 
-## 收敛判断准则
+## Convergence Judgment Criteria
 
-### 明确收敛的情况（建议评分≥0.85）
-- 观点演进趋于平缓，不再有实质性的新角度出现
-- 主要冲突点已得到充分讨论和有效管理
-- 讨论框架稳定，共识和分歧层次清晰
-- 基于现有内容能够生成综合性、高质量的答案
+### Clear Convergence Cases (recommended score ≥0.85)
+- Viewpoint evolution tends to be gradual, with no substantial new angles appearing
+- Main conflict points have been fully discussed and effectively managed
+- Discussion framework is stable, with clear hierarchy of consensus and divergences
+- Comprehensive, high-quality answers can be generated based on existing content
 
-### 继续讨论的情况（建议评分<0.85）
-- 仍有重要的新观点或证据可以引入
-- 关键冲突点尚未得到充分探讨或有效解决
-- 讨论框架仍在演变，不够稳定
-- 现有信息不足以生成全面、平衡的答案
+### Continue Discussion Cases (recommended score <0.85)
+- There are still important new viewpoints or evidence that can be introduced
+- Key conflict points have not yet been fully explored or effectively resolved
+- Discussion framework is still evolving and not stable enough
+- Existing information is insufficient to generate comprehensive, balanced answers
 
 ---
 
-# 待分析内容
+# Content to Analyze
 
-## 用户原始问题
+## User's Original Question
 {user_query}
 
 {previous_chairman_context}
 
-## 本轮 LLM 回复内容
+## This Round's LLM Response Content
 {responses_text}
 
 ---
 
-# 开始分析
-**严格按照上述对比分析流程，基于所有信息进行深度分析，并按照指定格式输出你的评估结果。**
+# Start Analysis
+**Strictly follow the above comparative analysis process, conduct deep analysis based on all information, and output your assessment results according to the specified format.**
 
-**特别注意**:
-- 必须充分对比本轮与上一轮的观点演进
-- 收敛判断要基于讨论质量，而非观点一致性
-- 最终答案要客观反映共识点和分歧点
+**Special Attention**:
+- Must fully compare viewpoint evolution between current and previous rounds
+- Convergence judgment should be based on discussion quality, not viewpoint consistency
+- Final answers should objectively reflect consensus points and divergence points
 """
 
     messages = [{"role": "user", "content": chairman_prompt}]
@@ -515,116 +531,123 @@ def build_convergent_prompt(
         Formatted prompt string for convergent phase
     """
     # Optimized convergent phase prompt with enhanced consensus/conflict analysis
-    system_prompt = """# 角色与任务
+    system_prompt = """# Role and Task
 
-## 角色定义
-你是多智能体协作系统的 AI 模型，参与收敛阶段的讨论。你的任务不仅仅是回答问题，还要深度分析上一轮的讨论结果。
+## Role Definition
+You are an AI model in a multi-agent collaboration system, participating in the convergent phase discussion. Your task is not only to answer questions but also to deeply analyze the previous round's discussion results.
 
-## 核心任务
+## Language Consistency Requirement
+**IMPORTANT**: The language of your response MUST match the language of the user's question:
+- If the user asks in English, respond in English
+- If the user asks in Chinese (中文), respond in Chinese (中文)
+- If the user asks in any other language, respond in the same language
+- Maintain language consistency throughout your entire response, including all JSON values
 
-### 🔍 深度分析上一轮讨论结果
+## Core Tasks
 
-#### 1. 共识点深度分析
-**对每个共识点，你必须思考并回答：**
-- **同意程度**: 你完全同意、部分同意还是不同意这个共识点？
-- **补充说明**: 你是否能为这个共识点提供额外的证据、例子或细节？
-- **限制条件**: 这个共识点在什么条件下成立？有什么例外情况？
-- **深化理解**: 你能从什么新的角度或更深层次来解释这个共识点？
+### 🔍 Deep Analysis of Previous Round Discussion Results
 
-#### 2. 冲突点深度分析
-**对每个冲突点，你必须思考并回答：**
-- **立场选择**: 你在这个冲突点上倾向于哪种观点？为什么？
-- **调和方案**: 你能提出什么方式来调和或解决这个冲突？
-- **根本原因**: 这个冲突点的根本原因是什么？是价值观差异、事实争议还是方法论分歧？
-- **影响评估**: 这个冲突点对最终答案的实质影响有多大？是否是关键分歧？
+#### 1. Deep Analysis of Consensus Points
+**For each consensus point, you must think and answer:**
+- **Agreement Level**: Do you completely agree, partially agree, or disagree with this consensus point?
+- **Supplementary Explanation**: Can you provide additional evidence, examples, or details for this consensus point?
+- **Limiting Conditions**: Under what conditions does this consensus point hold? Are there exceptions?
+- **Deeper Understanding**: Can you explain this consensus point from new angles or deeper levels?
 
-### 🎯 回答Chairman问题
-- 基于上述深度分析，回答本轮Chairman提出的问题
-- 将你的分析结论与问题回答有机结合
-- 推进讨论向收敛方向发展
+#### 2. Deep Analysis of Conflict Points
+**For each conflict point, you must think and answer:**
+- **Position Choice**: Which viewpoint do you tend to take on this conflict point? Why?
+- **Reconciliation Approach**: What methods can you propose to reconcile or resolve this conflict?
+- **Root Cause**: What is the fundamental cause of this conflict point? Is it value differences, factual disputes, or methodological disagreements?
+- **Impact Assessment**: How much substantive impact does this conflict point have on the final answer? Is it a key divergence?
 
-### 📋 结构化输出
-- 使用结构化 JSON 格式输出你的分析结果
-- 确保分析深度和逻辑清晰性
+### 🎯 Answer Chairman Questions
+- Answer the questions raised by this round's Chairman based on the above deep analysis
+- Organically integrate your analysis conclusions with question answers
+- Promote discussion toward convergence
+
+### 📋 Structured Output
+- Use structured JSON format to output your analysis results
+- Ensure analysis depth and logical clarity
 
 ---
 
-# 输出格式
+# Output Format
 
-## 必须严格遵守以下 JSON 格式：
+## Must strictly adhere to the following JSON format:
 
 ```json
 {
-  "summary": "本轮你的思考简述，重点说明对共识点和冲突点的深度分析",
-  "viewpoints": ["你的主要观点1", "你的主要观点2", "你的主要观点3", ...],
+  "summary": "Brief description of your thinking this round, focusing on deep analysis of consensus points and conflict points",
+  "viewpoints": ["Your main viewpoint 1", "Your main viewpoint 2", "Your main viewpoint 3", ...],
   "consensus_analysis": [
     {
-      "consensus_point": "对应的共识点",
-      "agreement_level": "完全同意/部分同意/不同意",
-      "supplement": "你的补充说明或新证据",
-      "conditions": "成立条件或例外情况",
-      "deeper_insight": "更深层次的理解或角度"
+      "consensus_point": "Corresponding consensus point",
+      "agreement_level": "Completely agree/Partially agree/Disagree",
+      "supplement": "Your supplementary explanations or new evidence",
+      "conditions": "Established conditions or exceptions",
+      "deeper_insight": "Deeper understanding or perspective"
     }
   ],
   "conflict_analysis": [
     {
-      "conflict_point": "对应的冲突点",
-      "your_position": "你的立场和理由",
-      "reconciliation_approach": "调和或解决冲突的建议",
-      "root_cause": "冲突的根本原因分析",
-      "impact_assessment": "对最终答案的影响程度"
+      "conflict_point": "Corresponding conflict point",
+      "your_position": "Your position and reasons",
+      "reconciliation_approach": "Suggestions for reconciling or resolving conflicts",
+      "root_cause": "Analysis of the root cause of the conflict",
+      "impact_assessment": "Degree of impact on the final answer"
     }
   ],
   "conflicts": [
-    "你与其他模型的主要不同点（基于上述分析）"
+    "Main differences with other models (based on above analysis)"
   ],
   "suggestions": [
-    "基于你的深度分析，讨论应该增加或修正的内容"
+    "Content that should be added or modified based on your deep analysis"
   ],
-  "final_answer_candidate": "如果你需要提供最终答案，请放在这里"
+  "final_answer_candidate": "If you need to provide a final answer, put it here"
 }
 ```
 
-## 输出要求
-1. **必须使用 JSON 格式**，不得包含解释性文字
-2. **深度分析要求**: 对每个共识点和冲突点都要进行深入分析，不得简单重复
-3. **逻辑清晰**: 分析要有明确的逻辑链条和证据支持
-4. **建设性导向**: 不仅要分析问题，还要提出解决方案
+## Output Requirements
+1. **Must use JSON format**, no explanatory text allowed
+2. **Deep Analysis Requirements**: Conduct in-depth analysis of each consensus point and conflict point, no simple repetition
+3. **Logical Clarity**: Analysis should have clear logical chains and evidence support
+4. **Constructive Orientation**: Not only analyze problems but also propose solutions
 
 ---
 
-# 讨论上下文
+# Discussion Context
 
-## 📊 上一轮 Chairman 评估结果
+## 📊 Previous Round Chairman Assessment Results
 
-### 🎯 已识别的共识点（要求深度分析）
+### 🎯 Identified Consensus Points (requiring deep analysis)
 """
 
     # Add consensus points with analysis guidance
-    system_prompt += "**请对以下每个共识点进行深度分析（必须包含：同意程度、补充说明、限制条件、深化理解）：**\n"
+    system_prompt += "**Please conduct deep analysis for each of the following consensus points (must include: agreement level, supplementary explanation, limiting conditions, deeper understanding):**\n"
     for i, point in enumerate(consensus_points, 1):
-        system_prompt += f"{i}. **{point}**\n   - *你的分析要求：同意程度？补充证据？成立条件？深层理解？*\n"
+        system_prompt += f"{i}. **{point}**\n   - *Your analysis requirements: agreement level? supplementary evidence? established conditions? deeper understanding?*\n"
 
-    system_prompt += "\n### ⚡ 已识别的冲突点（要求深度分析）\n"
-    system_prompt += "**请对以下每个冲突点进行深度分析（必须包含：立场选择、调和方案、根本原因、影响评估）：**\n"
+    system_prompt += "\n### ⚡ Identified Conflict Points (requiring deep analysis)\n"
+    system_prompt += "**Please conduct deep analysis for each of the following conflict points (must include: position choice, reconciliation approach, root cause, impact assessment):**\n"
     for i, point in enumerate(conflict_points, 1):
-        system_prompt += f"{i}. **{point}**\n   - *你的分析要求：你的立场？解决建议？根本原因？影响程度？*\n"
+        system_prompt += f"{i}. **{point}**\n   - *Your analysis requirements: your position? resolution suggestions? root cause? impact degree?*\n"
 
-    system_prompt += "\n---\n\n# 🎯 本轮核心任务\n\n## 📋 用户原始问题\n"
+    system_prompt += "\n---\n\n# 🎯 This Round's Core Tasks\n\n## 📋 User's Original Question\n"
     system_prompt += f"{user_query}\n\n"
 
-    system_prompt += "## ❓ 本轮必须回答的问题\n"
+    system_prompt += "## ❓ Questions That Must Be Answered This Round\n"
     for i, question in enumerate(questions, 1):
-        system_prompt += f"{i}. **{question}**\n   - *回答要求：请结合上述对共识点和冲突点的深度分析来回答这个问题*\n"
+        system_prompt += f"{i}. **{question}**\n   - *Answer requirements: Please answer this question combining the above deep analysis of consensus points and conflict points*\n"
 
-    system_prompt += "\n## 🔗 整合要求\n"
-    system_prompt += "**你的回答必须体现以下整合能力：**\n"
-    system_prompt += "1. **分析整合**: 将你对共识点和冲突点的深度分析与问题回答有机结合\n"
-    system_prompt += "2. **演进视角**: 说明你的分析如何帮助讨论从分歧走向共识\n"
-    system_prompt += "3. **解决方案**: 针对冲突点提出具体的调和或解决方案\n"
-    system_prompt += "4. **收敛导向**: 你的观点如何促进整个讨论的收敛\n"
+    system_prompt += "\n## 🔗 Integration Requirements\n"
+    system_prompt += "**Your answers must demonstrate the following integration capabilities:**\n"
+    system_prompt += "1. **Analysis Integration**: Organically integrate your deep analysis of consensus points and conflict points with question answers\n"
+    system_prompt += "2. **Evolution Perspective**: Explain how your analysis helps discussion move from divergence to consensus\n"
+    system_prompt += "3. **Solution Approach**: Propose specific reconciliation or solution approaches for conflict points\n"
+    system_prompt += "4. **Convergence Orientation**: How your viewpoints promote the convergence of the entire discussion\n"
 
-    system_prompt += "\n---\n\n# 🚀 开始回答\n**请严格基于以上深度分析要求，按照指定 JSON 格式输出你的观点。你的分析深度将直接影响讨论的收敛质量。**"
+    system_prompt += "\n---\n\n# 🚀 Start Answering\n**Please output your viewpoints according to the specified JSON format, strictly based on the above deep analysis requirements. Your analysis depth will directly affect the convergence quality of the discussion.**"
 
     return system_prompt
 
