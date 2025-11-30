@@ -19,3 +19,7 @@ data/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+
+# Test files - ignore all files starting with 'test' in all directories
+test*
+**/test*
