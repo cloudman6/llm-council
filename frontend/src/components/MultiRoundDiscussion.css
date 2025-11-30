@@ -179,14 +179,12 @@
 }
 
 .model-header {
+  color: #888;
+  font-size: 14px;
+  font-family: monospace;
   margin-bottom: 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid #e0e0e0;
-}
-
-.model-header strong {
-  font-size: 14px;
-  color: #333;
 }
 
 .json-response {

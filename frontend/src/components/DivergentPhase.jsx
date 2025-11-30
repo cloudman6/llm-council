@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import './DivergentPhase.css';
 
-export default function DivergentPhase({ responses }) {
+export default function DivergentPhase({ responses, roundNumber = 1 }) {
   const [activeTab, setActiveTab] = useState(0);
 
   if (!responses || responses.length === 0) {
     return null;
   }
+
+  // Check if this is round 1 (no conflicts/suggestions) or subsequent rounds
+  const isFirstRound = roundNumber === 1;
 
   return (
     <div className="stage divergent-phase">
@@ -44,22 +47,30 @@ export default function DivergentPhase({ responses }) {
                   ))}
                 </ul>
               </div>
-              <div className="json-field">
-                <strong>Conflicts:</strong>
-                <ul>
-                  {responses[activeTab].parsed_json.conflicts.map((conflict, idx) => (
-                    <li key={idx}>{conflict}</li>
-                  ))}
-                </ul>
-              </div>
-              <div className="json-field">
-                <strong>Suggestions:</strong>
-                <ul>
-                  {responses[activeTab].parsed_json.suggestions.map((suggestion, idx) => (
-                    <li key={idx}>{suggestion}</li>
-                  ))}
-                </ul>
-              </div>
+
+              {/* Only show conflicts and suggestions for rounds 2+ */}
+              {!isFirstRound && responses[activeTab].parsed_json.conflicts && (
+                <div className="json-field">
+                  <strong>Conflicts:</strong>
+                  <ul>
+                    {responses[activeTab].parsed_json.conflicts.map((conflict, idx) => (
+                      <li key={idx}>{conflict}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {!isFirstRound && responses[activeTab].parsed_json.suggestions && (
+                <div className="json-field">
+                  <strong>Suggestions:</strong>
+                  <ul>
+                    {responses[activeTab].parsed_json.suggestions.map((suggestion, idx) => (
+                      <li key={idx}>{suggestion}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div className="json-field">
                 <strong>Final Answer Candidate:</strong> {responses[activeTab].parsed_json.final_answer_candidate}
               </div>

@@ -137,22 +137,30 @@ export default function MultiRoundDiscussion({ all_rounds, final_result, metadat
                                   ))}
                                 </ul>
                               </div>
-                              <div className="json-field">
-                                <strong>Conflicts:</strong>
-                                <ul>
-                                  {response.parsed_json.conflicts.map((conflict, cIndex) => (
-                                    <li key={cIndex}>{conflict}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                              <div className="json-field">
-                                <strong>Suggestions:</strong>
-                                <ul>
-                                  {response.parsed_json.suggestions.map((suggestion, sIndex) => (
-                                    <li key={sIndex}>{suggestion}</li>
-                                  ))}
-                                </ul>
-                              </div>
+
+                              {/* Only show conflicts and suggestions for rounds 2+ */}
+                              {index > 0 && response.parsed_json.conflicts && (
+                                <div className="json-field">
+                                  <strong>Conflicts:</strong>
+                                  <ul>
+                                    {response.parsed_json.conflicts.map((conflict, cIndex) => (
+                                      <li key={cIndex}>{conflict}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {index > 0 && response.parsed_json.suggestions && (
+                                <div className="json-field">
+                                  <strong>Suggestions:</strong>
+                                  <ul>
+                                    {response.parsed_json.suggestions.map((suggestion, sIndex) => (
+                                      <li key={sIndex}>{suggestion}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
                               {response.parsed_json.final_answer_candidate && (
                                 <div className="json-field">
                                   <strong>Final Answer Candidate:</strong>

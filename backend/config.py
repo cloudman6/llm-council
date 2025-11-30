@@ -22,7 +22,8 @@ COUNCIL_MODELS = [
 ]
 
 # Chairman model - synthesizes final response
-CHAIRMAN_MODEL = "deepseek/deepseek-v3.2-exp"
+# CHAIRMAN_MODEL = "deepseek/deepseek-v3.2-exp"
+CHAIRMAN_MODEL = "z-ai/glm-4.5-air:free"
 
 # OpenRouter API endpoint
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
