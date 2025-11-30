@@ -23,3 +23,6 @@ frontend/.vite/
 # Test files - ignore all files starting with 'test' in all directories
 test*
 **/test*
+
+# Task file - keep local but don't track in git
+task.md
