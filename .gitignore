@@ -24,5 +24,6 @@ frontend/.vite/
 test*
 **/test*
 
-# Task file - keep local but don't track in git
 task.md
+
+.playwright-mcp

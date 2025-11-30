@@ -165,7 +165,12 @@ export default function MultiRoundDiscussion({ all_rounds, final_result, metadat
                                 <div className="json-field">
                                   <strong>Final Answer Candidate:</strong>
                                   <div className="markdown-content">
-                                    <ReactMarkdown>{response.parsed_json.final_answer_candidate}</ReactMarkdown>
+                                    <ReactMarkdown>
+                                      {typeof response.parsed_json.final_answer_candidate === 'string'
+                                        ? response.parsed_json.final_answer_candidate
+                                        : JSON.stringify(response.parsed_json.final_answer_candidate, null, 2)
+                                      }
+                                    </ReactMarkdown>
                                   </div>
                                 </div>
                               )}
@@ -216,7 +221,14 @@ export default function MultiRoundDiscussion({ all_rounds, final_result, metadat
                     <div className="final-conclusion">
                       <strong>Final Integrated Conclusion:</strong>
                       <div className="markdown-content">
-                        <ReactMarkdown>{round.chairman_assessment.final_integrated_conclusion}</ReactMarkdown>
+                        <ReactMarkdown>
+                          {typeof round.chairman_assessment.final_integrated_conclusion === 'string'
+                            ? round.chairman_assessment.final_integrated_conclusion
+                            : round.chairman_assessment.final_integrated_conclusion
+                              ? JSON.stringify(round.chairman_assessment.final_integrated_conclusion, null, 2)
+                              : 'No final conclusion provided'
+                          }
+                        </ReactMarkdown>
                       </div>
                     </div>
                   ) : (
@@ -242,7 +254,12 @@ export default function MultiRoundDiscussion({ all_rounds, final_result, metadat
           <h3>Final Result</h3>
           <div className="final-response">
             <div className="markdown-content">
-              <ReactMarkdown>{final_result.response}</ReactMarkdown>
+              <ReactMarkdown>
+                {typeof final_result.response === 'string'
+                  ? final_result.response
+                  : JSON.stringify(final_result.response, null, 2)
+                }
+              </ReactMarkdown>
             </div>
           </div>
         </div>

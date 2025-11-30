@@ -3,7 +3,7 @@
 from typing import List, Dict, Any, Optional
 import json
 from .openrouter import query_models_parallel, query_model
-from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
+from .config import COUNCIL_MODELS, CHAIRMAN_MODEL, CONVERGENCE_THRESHOLD
 
 
 async def divergent_phase_responses(user_query: str) -> List[Dict[str, Any]]:
@@ -284,7 +284,7 @@ async def evaluate_convergence(
 **Special Note**: Convergence does not mean complete agreement, but rather that the discussion framework is stable, divergences are clear and manageable, and a comprehensive high-quality answer can be formed.
 """
 
-    # Build optimized chairman prompt with clear structure
+    # Build optimized chairman prompt with clear structure and configurable threshold
     chairman_prompt = f"""# Role Definition
 You are the Chairman LLM (facilitator model) of a multi-agent collaboration system, responsible for guiding the discussion process and assessing convergence status.
 
@@ -387,17 +387,19 @@ You are the Chairman LLM (facilitator model) of a multi-agent collaboration syst
 
 ## Convergence Judgment Criteria
 
-### Clear Convergence Cases (recommended score ≥0.85)
+### Clear Convergence Cases (score ≥ {CONVERGENCE_THRESHOLD})
 - Viewpoint evolution tends to be gradual, with no substantial new angles appearing
 - Main conflict points have been fully discussed and effectively managed
 - Discussion framework is stable, with clear hierarchy of consensus and divergences
 - Comprehensive, high-quality answers can be generated based on existing content
 
-### Continue Discussion Cases (recommended score <0.85)
+### Continue Discussion Cases (score < {CONVERGENCE_THRESHOLD})
 - There are still important new viewpoints or evidence that can be introduced
 - Key conflict points have not yet been fully explored or effectively resolved
 - Discussion framework is still evolving and not stable enough
 - Existing information is insufficient to generate comprehensive, balanced answers
+
+**IMPORTANT**: You can only set `is_converged = true` when your `convergence_score` is **greater than or equal to {CONVERGENCE_THRESHOLD}**. If your score is below this threshold, you must set `is_converged = false` and provide questions for the next round.
 
 ---
 
@@ -495,6 +497,33 @@ You are the Chairman LLM (facilitator model) of a multi-agent collaboration syst
             if field not in chairman_assessment:
                 print(f"Warning: Chairman missing required field '{field}' in JSON")
                 chairman_assessment[field] = "" if field == "final_integrated_conclusion" else []
+
+        # Enforce convergence threshold validation
+        convergence_score = chairman_assessment.get('convergence_score', 0.0)
+        is_converged = chairman_assessment.get('is_converged', False)
+
+        # Validate convergence score is a number
+        try:
+            convergence_score = float(convergence_score)
+        except (ValueError, TypeError):
+            print(f"Warning: Chairman convergence_score '{convergence_score}' is not a number, defaulting to 0.0")
+            convergence_score = 0.0
+            chairman_assessment['convergence_score'] = 0.0
+
+        # Enforce threshold: if score < threshold, force is_converged to False
+        if convergence_score < CONVERGENCE_THRESHOLD and is_converged:
+            print(f"Warning: Chairman set is_converged=true with score {convergence_score} < threshold {CONVERGENCE_THRESHOLD}")
+            print(f"Force: Setting is_converged=false and requiring questions for next round")
+            chairman_assessment['is_converged'] = False
+
+            # Ensure we have questions for next round when not converged
+            if not chairman_assessment.get('questions_for_next_round'):
+                chairman_assessment['questions_for_next_round'] = [
+                    f"Please continue discussion to reach convergence threshold of {CONVERGENCE_THRESHOLD}"
+                ]
+
+            # Clear final integrated conclusion when not converged
+            chairman_assessment['final_integrated_conclusion'] = ""
 
         return chairman_assessment
 

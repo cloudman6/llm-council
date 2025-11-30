@@ -30,3 +30,7 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Data directory for conversation storage
 DATA_DIR = "data/conversations"
+
+# Convergence threshold for chairman evaluation
+# Chairman can only set is_converged=true when convergence_score >= this threshold
+CONVERGENCE_THRESHOLD = 0.85

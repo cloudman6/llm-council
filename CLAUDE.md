@@ -15,6 +15,7 @@ LLM Council is a **production-ready, highly sophisticated multi-round deliberati
 **`config.py`**
 - Contains `COUNCIL_MODELS` (list of OpenRouter model identifiers)
 - Contains `CHAIRMAN_MODEL` (model that synthesizes final answer)
+- Contains `CONVERGENCE_THRESHOLD` (configurable threshold for chairman convergence assessment, default: 0.85)
 - Uses environment variable `OPENROUTER_API_KEY` from `.env`
 - Backend runs on **port 8001** (NOT 8000 - user had another app on 8000)
 - **Current Models (Free Tier)**:
@@ -31,7 +32,7 @@ LLM Council is a **production-ready, highly sophisticated multi-round deliberati
 
 **`council.py`** - The Core Logic (**HEAVILY OPTIMIZED**)
 - `divergent_phase_responses()`: Sequential responses where each model sees all previous responses
-- `evaluate_convergence()`: **OPTIMIZED** - Chairman assesses convergence with systematic round-by-round comparison analysis
+- `evaluate_convergence()`: **OPTIMIZED** - Chairman assesses convergence with systematic round-by-round comparison analysis and configurable threshold enforcement
 - `run_convergent_phase()`: **ENHANCED** - Deep analysis requirements with structured JSON output
 - `build_divergent_prompt()`: Builds prompt for divergent phase with accumulated context
 - `build_convergent_prompt()`: **COMPLETELY REWRITTEN** - Forces deep analysis of consensus/conflict points
@@ -49,6 +50,16 @@ LLM Council is a **production-ready, highly sophisticated multi-round deliberati
    - Mandatory deep analysis of each conflict point (position, reconciliation, root cause, impact)
    - New JSON fields: `consensus_analysis[]`, `conflict_analysis[]`
    - Integration requirements: analysis must combine with question answering
+
+3. **Configurable Convergence Threshold** (Latest):
+   - Added `CONVERGENCE_THRESHOLD` configuration in `config.py` (default: 0.85)
+   - Chairman prompt explicitly instructs threshold requirements
+   - **Automatic Threshold Enforcement**: System validates and enforces threshold compliance
+   - If chairman sets `is_converged=true` with score below threshold, system automatically:
+     - Sets `is_converged=false`
+     - Generates questions for next round
+     - Clears final integrated conclusion
+   - Full logging for debugging threshold enforcement actions
 
 **`storage.py`**
 - JSON-based conversation storage in `data/conversations/`
@@ -117,8 +128,8 @@ LLM Council is a **production-ready, highly sophisticated multi-round deliberati
 ### Multi-Round Discussion Process
 - **Divergent Phase**: Models respond sequentially, building on previous responses to explore diverse perspectives
 - **Convergent Phase**: **ENHANCED** - Models perform deep analysis of consensus/conflict points with structured requirements
-- **Chairman Assessment**: **OPTIMIZED** - Systematic round-by-round comparison with 4-dimension evaluation
-- **Iterative Process**: Continues until convergence (≥0.8) is achieved or maximum rounds reached
+- **Chairman Assessment**: **OPTIMIZED** - Systematic round-by-round comparison with 4-dimension evaluation and configurable threshold enforcement
+- **Iterative Process**: Continues until convergence (≥CONVERGENCE_THRESHOLD, default 0.85) is achieved or maximum rounds reached
 
 ### Role-Free Implementation
 - Models don't have predefined roles (innovator, critic, etc.)
@@ -255,7 +266,8 @@ The codebase includes extensive testing to verify optimizations and ensure relia
 
 **Convergence Detection:**
 - **Optimized Accuracy**: Significant improvement in convergence assessment
-- **Threshold Optimization**: ≥0.85 for converged, <0.85 for continue discussion
+- **Configurable Threshold**: Controlled by `CONVERGENCE_THRESHOLD` in config.py (default: 0.85)
+- **Automatic Enforcement**: System ensures chairman respects threshold requirements
 - **Round Reduction**: Faster convergence through deeper analysis requirements
 
 **Quality Assurance:**
@@ -283,11 +295,11 @@ User Query
     ↓
 Round 1: Divergent Phase (sequential responses with accumulated context)
     ↓
-Chairman Assessment: OPTIMIZED systematic evaluation with round comparison
+Chairman Assessment: OPTIMIZED systematic evaluation with round comparison and configurable threshold enforcement
     ↓
 If not converged: Round 2+ Convergent Phase (ENHANCED deep analysis with structured requirements)
     ↓
-Repeat until convergence (≥0.85) or max rounds
+Repeat until convergence (≥CONVERGENCE_THRESHOLD, default 0.85) or max rounds
     ↓
 Final Integrated Conclusion from chairman with comprehensive reasoning
     ↓

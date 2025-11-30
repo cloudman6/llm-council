@@ -20,6 +20,8 @@ The system uses a sophisticated **divergent → convergent** discussion process:
   - **Consensus Points**: Areas of agreement and shared understanding
   - **Conflict Points**: Disagreements requiring further exploration
   - **Convergence Score**: 0.0-1.0 rating of discussion stability
+- **Configurable Threshold**: Chairman can only declare convergence when score ≥ 0.85 (configurable)
+- **Automatic Enforcement**: System validates threshold compliance and corrects violations
 - Generates targeted questions for the next round if needed
 
 ### 🎯 **Round 2+: Convergent Phase**
@@ -29,10 +31,11 @@ The system uses a sophisticated **divergent → convergent** discussion process:
 - Goal: Resolve conflicts, strengthen consensus, and stabilize discussion framework
 
 ### ✅ **Final Integration**
-- When convergence is achieved (score ≥0.85), the Chairman synthesizes:
+- When convergence is achieved (score ≥CONVERGENCE_THRESHOLD, default 0.85), the Chairman synthesizes:
   - Integrated conclusion incorporating all perspectives
   - Acknowledgment of remaining disagreements
   - Comprehensive answer with reasoning transparency
+- **Threshold Enforcement**: System automatically ensures convergence threshold is met before final integration
 
 ## Key Features
 
@@ -52,6 +55,8 @@ The system is currently configured with free-tier models for accessibility:
 - `kwaipilot/kat-coder-pro:free` - Technical and analytical insights
 
 **Chairman:** `z-ai/glm-4.5-air:free` - Manages discussion flow and synthesizes final answers
+
+**Convergence Threshold:** `0.85` - Chairman can only declare convergence when convergence_score ≥ 0.85 (configurable in `backend/config.py`)
 
 ## Setup
 
@@ -94,6 +99,10 @@ COUNCIL_MODELS = [
 ]
 
 CHAIRMAN_MODEL = "google/gemini-3-pro-preview"
+
+# Configure convergence threshold (default: 0.85)
+# Chairman can only declare convergence when convergence_score >= this threshold
+CONVERGENCE_THRESHOLD = 0.85
 ```
 
 ## Running the Application
